@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>微波论坛 · 此刻，说点什么</title>
+  <meta name="description" content="微波论坛 —— 轻量微社区。发布此刻的想法，内容保存在本机浏览器中。" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23FF6B2C'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23fff' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <span class="orb orb--one"></span>
+    <span class="orb orb--two"></span>
+    <span class="orb orb--three"></span>
+    <span class="grid-glow"></span>
+  </div>
+
+  <header class="topbar" id="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <span class="brand__wave"></span>
+          <span class="brand__dot"></span>
+        </span>
+        <span class="brand__text">
+          <span class="brand__name">微波论坛</span>
+          <span class="brand__sub">MICROWAVE&nbsp;FORUM</span>
+        </span>
+      </div>
+
+      <button class="userchip" id="editUserBtn" type="button" aria-haspopup="dialog">
+        <span class="avatar avatar--sm" id="userAvatar" aria-hidden="true">我</span>
+        <span class="userchip__meta">
+          <span class="userchip__label">当前身份</span>
+          <span class="userchip__name" id="userName">加载中…</span>
+        </span>
+        <svg class="userchip__pen" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+          <path d="M14.5 5.5 18 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero" aria-labelledby="heroTitle">
+      <p class="hero__eyebrow">今日热度 · 微波在线</p>
+      <h1 class="hero__title" id="heroTitle">把此刻的想法，<br />放进微波里转一圈。</h1>
+      <p class="hero__desc">一个只属于你这台设备的轻量小社区。发布、点赞、搜索，数据全部留在本地浏览器。</p>
+    </section>
+
+    <section class="composer card" aria-label="发布新动态">
+      <div class="composer__head">
+        <span class="avatar avatar--lg" id="composerAvatar" aria-hidden="true">我</span>
+        <label class="composer__field">
+          <span class="sr-only">动态内容</span>
+          <textarea
+            id="composerInput"
+            class="composer__input"
+            rows="3"
+            maxlength="200"
+            placeholder="此刻，说点什么…"
+            aria-describedby="composerHint"></textarea>
+        </label>
+      </div>
+      <div class="composer__foot">
+        <div class="composer__hint" id="composerHint">
+          <span class="counter" id="charCount" aria-live="polite">0 / 140</span>
+          <span class="composer__kbd">Ctrl / ⌘ + Enter 发布</span>
+        </div>
+        <button class="btn btn--primary" id="publishBtn" type="button" disabled>
+          <span>发布</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12h13M12 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="toolbar" aria-label="筛选与搜索">
+      <label class="search">
+        <svg class="search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8" />
+          <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+        <input id="searchInput" class="search__input" type="search" placeholder="搜索内容或昵称" autocomplete="off" />
+      </label>
+
+      <div class="segmented" id="segmented" role="tablist" aria-label="时间线筛选">
+        <span class="segmented__thumb" id="segThumb" aria-hidden="true"></span>
+        <button class="segmented__btn is-active" type="button" role="tab" aria-selected="true" data-filter="all">全部</button>
+        <button class="segmented__btn" type="button" role="tab" aria-selected="false" data-filter="mine">我的</button>
+      </div>
+    </section>
+
+    <section class="timeline" id="timeline" aria-live="polite" aria-label="动态时间线"></section>
+
+    <p class="page__foot">数据仅保存在此浏览器的本地存储中，清理浏览器数据会一并删除。</p>
+  </main>
+
+  <dialog class="sheet" id="userDialog" aria-labelledby="userDialogTitle">
+    <form method="dialog" class="sheet__form" id="userForm">
+      <h2 class="sheet__title" id="userDialogTitle">修改我的昵称</h2>
+      <p class="sheet__desc">昵称只保存在本地，最多 12 个字符。修改后会同步更新你已发布的内容。</p>
+      <label class="field">
+        <span class="field__label">昵称</span>
+        <input id="userNameInput" class="field__input" type="text" maxlength="12" placeholder="例如：微波小厨" autocomplete="off" />
+      </label>
+      <div class="sheet__actions">
+        <button class="btn btn--ghost" type="button" id="cancelUserBtn">取消</button>
+        <button class="btn btn--primary" type="submit" id="saveUserBtn">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
