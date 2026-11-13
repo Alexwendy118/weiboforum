@@ -1,0 +1,153 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: 微波论坛
+        - generic [ref=e11]: MICROWAVE FORUM
+      - paragraph [ref=e12]: 本地社区 · 3 条动态 · 47 次点赞
+      - button "当前身份 微波过客" [ref=e13] [cursor=pointer]:
+        - generic [aria-hidden] [ref=e14]: 微
+        - generic [ref=e15]:
+          - generic [ref=e16]: 当前身份
+          - generic [ref=e17]: 微波过客
+  - main [ref=e21]:
+    - region "把此刻的想法， 放进微波里转一圈。" [ref=e22]:
+      - generic [ref=e23]:
+        - paragraph [ref=e24]: 今日热度 · 微波在线
+        - heading "把此刻的想法， 放进微波里转一圈。" [level=1] [ref=e25]: 把此刻的想法，放进微波里转一圈。
+        - paragraph [ref=e26]: 发布、点赞、搜索都通过本地 Hono 服务完成。内容保存在服务端内存，刷新也不会丢。
+      - search [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: 搜索动态、昵称或关键词
+          - searchbox "搜索动态、昵称或关键词" [ref=e33]
+        - button "搜索" [ref=e34] [cursor=pointer]
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - strong [ref=e37]: "3"
+          - text: 条动态
+        - generic [ref=e38]:
+          - strong [ref=e39]: "47"
+          - text: 次点赞
+        - generic [ref=e40]:
+          - strong [ref=e41]: "4"
+          - text: 个板块
+    - generic [ref=e42]:
+      - complementary "功能导航" [ref=e43]:
+        - navigation "功能导航" [ref=e44]:
+          - heading "热门推荐" [level=2] [ref=e46]
+          - list [ref=e50]:
+            - listitem [ref=e51]:
+              - button "实时动态 3" [ref=e52] [cursor=pointer]:
+                - generic [ref=e56]: 实时动态
+                - generic [ref=e57]: "3"
+            - listitem [ref=e58]:
+              - button "热门榜 3" [ref=e59] [cursor=pointer]:
+                - generic [ref=e63]: 热门榜
+                - generic [ref=e64]: "3"
+            - listitem [ref=e65]:
+              - button "我赞过的 0" [ref=e66] [cursor=pointer]:
+                - generic [ref=e69]: 我赞过的
+                - generic [ref=e70]: "0"
+            - listitem [ref=e71]:
+              - button "我收藏的 2" [ref=e219] [cursor=pointer]:
+                - generic [ref=e75]: 我收藏的
+                - generic [ref=e76]: "2"
+            - listitem [ref=e77]:
+              - button "我的动态 0" [ref=e78] [cursor=pointer]:
+                - generic [ref=e82]: 我的动态
+                - generic [ref=e83]: "0"
+          - heading "板块" [level=2] [ref=e86]
+          - list [ref=e92]:
+            - listitem [ref=e93]:
+              - button "全部板块" [ref=e94] [cursor=pointer]
+            - listitem [ref=e95]:
+              - button "随笔" [ref=e96] [cursor=pointer]
+            - listitem [ref=e97]:
+              - button "生活" [ref=e98] [cursor=pointer]
+            - listitem [ref=e99]:
+              - button "科技" [ref=e100] [cursor=pointer]
+            - listitem [ref=e101]:
+              - button "心情" [ref=e102] [cursor=pointer]
+      - region "核心内容" [ref=e103]:
+        - region "发布新动态" [ref=e104]:
+          - generic [ref=e105]:
+            - generic [aria-hidden] [ref=e106]: 微
+            - generic [ref=e107]:
+              - generic [ref=e108]: 动态内容
+              - textbox "动态内容" [ref=e109]:
+                - /placeholder: 此刻，说点什么…
+          - generic [ref=e110]:
+            - generic [ref=e111]: 板块
+            - group "选择板块" [ref=e112]:
+              - button "随笔" [pressed] [ref=e113] [cursor=pointer]
+              - button "生活" [ref=e114] [cursor=pointer]
+              - button "科技" [ref=e115] [cursor=pointer]
+              - button "心情" [ref=e116] [cursor=pointer]
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - generic [ref=e119]: 0 / 140
+              - generic [ref=e120]: Ctrl / ⌘ + Enter 发布
+            - button "发布" [disabled] [ref=e121]
+        - generic [ref=e125]:
+          - tablist "时间线视图" [ref=e126]:
+            - tab "实时" [ref=e127] [cursor=pointer]
+            - tab "热门" [ref=e128] [cursor=pointer]
+            - tab "我收藏的" [active] [selected] [ref=e129] [cursor=pointer]
+            - tab "我的" [ref=e130] [cursor=pointer]
+          - paragraph [ref=e131]: 共 2 条
+        - region "动态时间线" [ref=e132]:
+          - article [ref=e133]:
+            - generic [ref=e134]:
+              - generic [aria-hidden] [ref=e135]: 微
+              - generic [ref=e136]:
+                - generic [ref=e137]: 微波小厨
+                - time [ref=e138]: 9 分钟前
+            - paragraph [ref=e139]: 新的一天，先把水烧上。热水冲开的茶叶，比任何提醒都更像一句“开始吧”。
+            - generic [ref=e140]:
+              - button "点赞" [ref=e141] [cursor=pointer]:
+                - generic [ref=e144]: "12"
+              - button "取消收藏" [pressed] [ref=e220] [cursor=pointer]
+              - generic [ref=e148]: "#生活"
+          - article [ref=e149]:
+            - generic [ref=e150]:
+              - generic [aria-hidden] [ref=e151]: 深
+              - generic [ref=e152]:
+                - generic [ref=e153]: 深夜放映员
+                - time [ref=e154]: 1 小时前
+            - paragraph [ref=e155]: 凌晨的街道只有便利店还亮着。买了一瓶温热的豆奶，站在门口喝完，忽然觉得这座城市也挺温柔。
+            - generic [ref=e156]:
+              - button "点赞" [ref=e157] [cursor=pointer]:
+                - generic [ref=e160]: "28"
+              - button "取消收藏" [pressed] [ref=e161] [cursor=pointer]
+              - generic [ref=e164]: "#心情"
+      - complementary "热榜与推荐" [ref=e181]:
+        - region "微波热榜" [ref=e182]:
+          - generic [ref=e183]:
+            - heading "微波热榜" [level=2] [ref=e184]
+            - button "换一换热榜内容" [ref=e188] [cursor=pointer]
+          - list [ref=e192]:
+            - listitem [ref=e193]:
+              - button "查看热榜第 1 条动态" [ref=e194] [cursor=pointer]:
+                - generic [ref=e195]: "1"
+                - generic [ref=e196]: 凌晨的街道只有便利店还亮着。买了一瓶温热的豆奶，站在门口喝完
+                - generic [ref=e197]: "28"
+            - listitem [ref=e198]:
+              - button "查看热榜第 2 条动态" [ref=e199] [cursor=pointer]:
+                - generic [ref=e200]: "2"
+                - generic [ref=e201]: 新的一天，先把水烧上。热水冲开的茶叶，比任何提醒都更像一句“
+                - generic [ref=e202]: "12"
+            - listitem [ref=e203]:
+              - button "查看热榜第 3 条动态" [ref=e204] [cursor=pointer]:
+                - generic [ref=e205]: "3"
+                - generic [ref=e206]: 今日小结： 1. 把桌面清空了一次 2. 走了 8200 步
+                - generic [ref=e207]: "7"
+        - generic [ref=e208]:
+          - generic [ref=e209]: 本地版 · v2.0
+          - heading "把此刻， 写进微波里。" [level=2] [ref=e210]: 把此刻，写进微波里。
+          - paragraph [ref=e211]: 没有账号，也没有云端。你写下的每一句，都留在本地运行的 Hono 服务里。
+          - button "发布动态" [ref=e212] [cursor=pointer]
+        - generic [ref=e213]:
+          - heading "小提示" [level=2] [ref=e214]
+          - paragraph [ref=e217]: 用左侧「板块」筛选内容，点击热榜条目可快速定位到对应动态。
+    - paragraph [ref=e218]: 数据保存在服务端内存中，重启服务后重置 · 微波论坛 v2.0
+  - status

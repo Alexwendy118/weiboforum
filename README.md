@@ -40,8 +40,9 @@ npm run dev:api    # 仅 Hono（tsx watch）
 
 - 发布文字动态（上限 140 字，实时字数提示，超限禁用发布并抖动提醒），发布时选择板块
 - 时间线按发布时间倒序展示，相对时间显示（刚刚 / N 分钟前 / N 小时前 / N 天前 / 具体日期）
-- 视图切换：实时 / 热门（按点赞排序）/ 我的 / 我赞过的；板块筛选可与视图叠加
+- 视图切换：实时 / 热门（按点赞排序）/ 我的 / 我赞过的 / 我收藏的；板块筛选可与视图叠加
 - 点赞 / 取消点赞（乐观更新 + 失败回滚），数量与状态由服务端保存，并实时反映到热榜与统计
+- 收藏 / 取消收藏（与点赞同构：乐观更新 + 失败回滚 + 请求串行化），服务端保存收藏状态，导航与统计实时联动
 - 删除自己发布的动态（仅本人可见入口，二次确认 + 淡出动画，服务端校验权限）
 - 关键词搜索（匹配正文、昵称或板块，大小写不敏感），输入即筛，回车/点击搜索给出结果提示
 - 热榜：按点赞排名，支持换一换、查看更多/收起，点击条目自动清空筛选并滚动定位、高亮对应动态
@@ -112,6 +113,7 @@ Base：`/api`，请求/响应均为 JSON；错误统一 `{ "error": "<code>" }`�
 | POST | `/posts` | `{ content, topic? }` | 201 `{ post }` | 400 `content-empty` / `content-too-long` / `invalid-body`；413 `payload-too-large` |
 | DELETE | `/posts/:id` | 删除本人动态 | 204 | 403 `forbidden`；404 `not-found` |
 | PUT | `/posts/:id/like` | `{ liked: boolean }`，幂等 | 200 `{ post }` | 400 `invalid-body`；404 `not-found` |
+| PUT | `/posts/:id/favorite` | `{ favorited: boolean }`，幂等 | 200 `{ post }` | 400 `invalid-body`；404 `not-found` |
 | GET | `/user` | 当前身份 | 200 `{ user }` | — |
 | PATCH | `/user` | `{ name }`，自动截断到 12 字符并同步本人动态作者名 | 200 `{ user }` | 400 `name-empty` / `invalid-body` |
 
@@ -123,20 +125,21 @@ Base：`/api`，请求/响应均为 JSON；错误统一 `{ "error": "<code>" }`�
 
 | 测试文件 | 数量 | 覆盖内容 |
 | --- | --- | --- |
-| `server/app.test.ts` | 25 | 全部端点契约、状态码、字段完整、倒序、幂等点赞、越权删除、改名同步、实例隔离、请求体上限 |
-| `src/api/client.test.ts` | 5 | 响应解析、结构不符报错、错误码透传、网络异常归一 |
-| `src/domain/*.test.ts` | 48 | 字数/时间/规范化/筛选/排序/热榜/空状态 |
-| `src/stores/forum.test.ts` | 32 | hydrate、发布校验、点赞幂等与竞态、删除权限、改名、筛选/统计、热榜、网络失败 |
-| `src/components/*.test.ts` | 36 | 发布卡、动态卡、时间线、热榜的渲染与异步交互 |
-| `src/App.test.ts` | 16 | 集成流程：发布 / 搜索 / 筛选 / 改名 / 点赞 / 删除 / 定位 / 重新拉取 / 加载与断连态 |
+| `server/app.test.ts` | 33 | 全部端点契约、状态码、字段完整、倒序、幂等点赞/收藏、越权删除、改名同步、实例隔离、请求体上限 |
+| `src/api/client.test.ts` | 8 | 响应解析、结构不符报错、错误码透传、网络异常归一、收藏请求 |
+| `src/domain/*.test.ts` | 51 | 字数/时间/规范化/筛选/排序/热榜/空状态（含收藏视图筛选） |
+| `src/stores/forum.test.ts` | 38 | hydrate、发布校验、点赞与收藏的幂等/竞态/回滚、删除权限、改名、筛选/统计、热榜、网络失败 |
+| `src/components/*.test.ts` | 39 | 发布卡、动态卡（含收藏按钮）、时间线、热榜的渲染与异步交互 |
+| `src/App.test.ts` | 19 | 集成流程：发布 / 搜索 / 筛选 / 改名 / 点赞 / 收藏 / 删除 / 定位 / 重新拉取 / 加载与断连态 |
 
 最近一次验收：
 
 ```
 Test Files  13 passed (13)
-     Tests  162 passed (162)
+     Tests  188 passed (188)
 vue-tsc --noEmit  通过
 vite build        通过
+浏览器验收        通过（收藏切换 / Tab 筛选 / 刷新持久化）
 ```
 
 ## 存储说明
@@ -156,6 +159,7 @@ vite build        通过
 
 ## 更新日志
 
+- **v2.1**：新增**收藏功能**（对齐点赞交互）：`PUT /posts/:id/favorite` 端点、动态卡收藏按钮、「我收藏的」视图 Tab、导航收藏计数、乐观更新 + 失败回滚 + 请求串行化；测试从 162 增至 188。开发采用 Git Worktree 双分支（后端 / 前端）并行 TDD 实现后合并。
 - **v2.0**：从 localStorage 迁移到 **Hono + REST + 内存存储**。新增 `server/`（store / app / 入口）与 `src/api/client.ts`；store 写操作异步化并支持失败回滚、点赞请求串行化、加载态与断连提示；测试从 120 增至 162，新增服务端契约测试与假后端。旧的 `src/storage/localStore.ts` 与 `STORAGE_KEYS` 已移除。
 - **v1.1**：新增左右侧栏、顶部通栏搜索条、视图 Tab、板块字段与热榜定位交互；三栏响应式断点。
 - **v1.0**：首个版本，单列信息流 + 发布 / 点赞 / 删除 / 搜索 / 本地昵称。
