@@ -19,9 +19,13 @@ const props = withDefaults(
 const store = useForumStore()
 const toast = useToast()
 
+const emit = defineEmits<{ favorite: [id: string] }>()
+
 const removing = ref(false)
 const bumping = ref(false)
+const favBumping = ref(false)
 let bumpTimer: ReturnType<typeof setTimeout> | undefined
+let favTimer: ReturnType<typeof setTimeout> | undefined
 let removeTimer: ReturnType<typeof setTimeout> | undefined
 
 const isMine = computed(() => props.post.authorId === store.user.id)
@@ -43,6 +47,21 @@ async function onLike(): Promise<void> {
   clearTimeout(bumpTimer)
   bumpTimer = setTimeout(() => {
     bumping.value = false
+  }, 440)
+}
+
+async function onFavorite(): Promise<void> {
+  if (!(await store.toggleFavorite(props.post.id))) {
+    toast.show('操作失败，请稍后再试')
+    return
+  }
+
+  emit('favorite', props.post.id)
+
+  favBumping.value = true
+  clearTimeout(favTimer)
+  favTimer = setTimeout(() => {
+    favBumping.value = false
   }, 440)
 }
 
@@ -77,6 +96,7 @@ function onDelete(): void {
 
 onBeforeUnmount(() => {
   clearTimeout(bumpTimer)
+  clearTimeout(favTimer)
   clearTimeout(removeTimer)
 })
 </script>
@@ -112,6 +132,17 @@ onBeforeUnmount(() => {
         @click="onLike">
         <AppIcon name="heart" />
         <span class="post__action-count">{{ post.likes }}</span>
+      </button>
+
+      <button
+        class="post__action"
+        :class="{ 'is-favorited': post.favorited, 'is-bumping': favBumping }"
+        type="button"
+        data-action="favorite"
+        :aria-pressed="post.favorited ? 'true' : 'false'"
+        :aria-label="post.favorited ? '取消收藏' : '收藏'"
+        @click="onFavorite">
+        <AppIcon name="star" />
       </button>
 
       <button

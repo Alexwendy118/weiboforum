@@ -2,6 +2,7 @@ export type IconName =
   | 'clock'
   | 'trending'
   | 'heart'
+  | 'star'
   | 'user'
   | 'grid'
   | 'flame'
@@ -29,6 +30,7 @@ export const ICONS: Record<IconName, IconPart[]> = {
     { d: 'M15 6.5h5v5' },
   ],
   heart: [{ d: 'M12 20s-7-4.2-7-9a4 4 0 0 1 7-2.7A4 4 0 0 1 19 11c0 4.8-7 9-7 9Z' }],
+  star: [{ d: 'M12 4.4l2.3 4.66 5.14.75-3.72 3.62.88 5.12L12 16.16l-4.6 2.39.88-5.12-3.72-3.62 5.14-.75L12 4.4Z' }],
   user: [
     { d: 'M12 5.2a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z' },
     { d: 'M5 19.4c.9-3 3.6-4.7 7-4.7s6.1 1.7 7 4.7' },

@@ -16,6 +16,7 @@ const { visiblePosts, view, query, topic } = storeToRefs(store)
 const tabs: Array<{ view: ViewMode; label: string }> = [
   { view: 'live', label: '实时' },
   { view: 'hot', label: '热门' },
+  { view: 'favorites', label: '我收藏的' },
   { view: 'mine', label: '我的' },
 ]
 

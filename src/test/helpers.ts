@@ -13,6 +13,7 @@ export function makePost(overrides: Partial<Post> = {}): Post {
     createdAt: Date.now(),
     likes: 0,
     likedByMe: false,
+    favorited: false,
     ...overrides,
   }
 }

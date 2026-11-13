@@ -6,6 +6,7 @@ import {
   deletePost as apiDeletePost,
   fetchPosts,
   fetchUser,
+  setFavorite,
   setPostLike,
   updateUserName,
 } from '@/api/client'
@@ -43,6 +44,8 @@ export const useForumStore = defineStore('forum', () => {
 
   /** 同一动态的点赞请求串行化，避免乱序响应覆盖状态 */
   const pendingLikes = new Set<string>()
+  /** 同一动态的收藏请求串行化，避免乱序响应覆盖状态 */
+  const pendingFavorites = new Set<string>()
   /** 加载期间是否已有写操作，避免迟到的 hydrate 覆盖本地结果 */
   let mutatedWhileLoading = false
 
@@ -57,9 +60,11 @@ export const useForumStore = defineStore('forum', () => {
 
   const stats = computed(() => {
     const likes = posts.value.reduce((sum, post) => sum + post.likes, 0)
+    const favorites = posts.value.filter((post) => post.favorited).length
     return {
       posts: posts.value.length,
       likes,
+      favorites,
       topics: TOPICS.length,
       quick: `本地社区 · ${posts.value.length} 条动态 · ${likes} 次点赞`,
     }
@@ -69,6 +74,7 @@ export const useForumStore = defineStore('forum', () => {
     live: posts.value.length,
     hot: posts.value.filter((post) => post.likes > 0).length,
     liked: posts.value.filter((post) => post.likedByMe).length,
+    favorites: posts.value.filter((post) => post.favorited).length,
     mine: posts.value.filter((post) => post.authorId === user.value.id).length,
   }))
 
@@ -153,6 +159,30 @@ export const useForumStore = defineStore('forum', () => {
       return false
     } finally {
       pendingLikes.delete(id)
+    }
+  }
+
+  async function toggleFavorite(id: string): Promise<boolean> {
+    if (pendingFavorites.has(id)) return false
+
+    const post = posts.value.find((item) => item.id === id)
+    if (!post) return false
+
+    const before = post.favorited
+    post.favorited = !before
+    mutatedWhileLoading = true
+    pendingFavorites.add(id)
+
+    try {
+      Object.assign(post, await setFavorite(id, !before))
+      markSuccess()
+      return true
+    } catch (error) {
+      post.favorited = before
+      markFailure(error)
+      return false
+    } finally {
+      pendingFavorites.delete(id)
     }
   }
 
@@ -242,6 +272,7 @@ export const useForumStore = defineStore('forum', () => {
     hydrate,
     publish,
     toggleLike,
+    toggleFavorite,
     removePost,
     renameUser,
     setView,

@@ -44,6 +44,15 @@ export function emptyCopyFor(state: EmptyState): EmptyCopy {
     }
   }
 
+  if (state.view === 'favorites') {
+    return {
+      title: '还没有收藏过',
+      desc: '点击动态下方的星形，把值得回味的动态收进来。',
+      action: '看看热榜',
+      kind: 'hot',
+    }
+  }
+
   if (state.topic) {
     return {
       title: `「${state.topic}」板块还很安静`,

@@ -12,6 +12,7 @@ const views: Array<{ view: ViewMode; label: string; icon: IconName }> = [
   { view: 'live', label: '实时动态', icon: 'clock' },
   { view: 'hot', label: '热门榜', icon: 'trending' },
   { view: 'liked', label: '我赞过的', icon: 'heart' },
+  { view: 'favorites', label: '我收藏的', icon: 'star' },
   { view: 'mine', label: '我的动态', icon: 'user' },
 ]
 

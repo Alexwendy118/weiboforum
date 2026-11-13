@@ -22,6 +22,7 @@ function makePost(overrides: Partial<Post> = {}): Post {
     createdAt: NOW,
     likes: 0,
     likedByMe: false,
+    favorited: false,
     ...overrides,
   }
 }
@@ -81,7 +82,16 @@ describe('normalizePosts', () => {
       createdAt: NOW,
       likes: 7,
       likedByMe: true,
+      favorited: false,
     })
+  })
+
+  it('收藏状态按布尔规范化，缺失时为 false', () => {
+    const [post] = normalizePosts([{ content: '带收藏标记', favorited: 1 }])
+    expect(post!.favorited).toBe(true)
+
+    const [fallback] = normalizePosts([{ content: '缺收藏标记' }])
+    expect(fallback!.favorited).toBe(false)
   })
 })
 
@@ -106,7 +116,7 @@ describe('filterPosts', () => {
   const posts: Post[] = [
     makePost({ id: 'a', content: '今天写 Vue 组件', author: '微波小厨', topic: '科技' }),
     makePost({ id: 'b', authorId: 'user-2', content: '天气不错', author: '路人', topic: '生活' }),
-    makePost({ id: 'c', content: '被点赞的随笔', topic: '随笔', likedByMe: true }),
+    makePost({ id: 'c', content: '被点赞的随笔', topic: '随笔', likedByMe: true, favorited: true }),
   ]
   const base = { view: 'live' as const, topic: '' as const, query: '', userId: 'user-1' }
 
@@ -120,6 +130,11 @@ describe('filterPosts', () => {
 
   it('我赞过的只保留已点赞内容', () => {
     expect(filterPosts(posts, { ...base, view: 'liked' }).map((post) => post.id)).toEqual(['c'])
+  })
+
+  it('我收藏的只保留已收藏内容，且可与板块叠加', () => {
+    expect(filterPosts(posts, { ...base, view: 'favorites' }).map((post) => post.id)).toEqual(['c'])
+    expect(filterPosts(posts, { ...base, view: 'favorites', topic: '科技' })).toEqual([])
   })
 
   it('板块筛选可叠加视图', () => {

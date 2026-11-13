@@ -119,6 +119,66 @@ describe('PostCard', () => {
     expect(useToast().message.value).toBe('操作失败，请稍后再试')
   })
 
+  it('收藏按钮渲染初始状态并支持收藏切换', async () => {
+    seedApi([makePost({ favorited: false })])
+    const store = useForumStore(pinia)
+    await flushPromises()
+    const wrapper = mount(PostCard, {
+      props: { post: store.posts[0]! },
+      global: { plugins: [pinia] },
+    })
+
+    const favButton = wrapper.find('[data-action="favorite"]')
+    expect(favButton.exists()).toBe(true)
+    expect(favButton.attributes('aria-pressed')).toBe('false')
+    expect(favButton.attributes('aria-label')).toBe('收藏')
+
+    await favButton.trigger('click')
+    await flushPromises()
+
+    expect(store.posts[0]).toMatchObject({ favorited: true })
+    expect(wrapper.find('[data-action="favorite"]').classes()).toContain('is-favorited')
+    expect(wrapper.find('[data-action="favorite"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-action="favorite"]').attributes('aria-label')).toBe('取消收藏')
+    expect(wrapper.emitted('favorite')).toEqual([['p-1']])
+  })
+
+  it('再次点击取消收藏', async () => {
+    seedApi([makePost({ favorited: true })])
+    const store = useForumStore(pinia)
+    await flushPromises()
+    const wrapper = mount(PostCard, {
+      props: { post: store.posts[0]! },
+      global: { plugins: [pinia] },
+    })
+
+    await wrapper.find('[data-action="favorite"]').trigger('click')
+    await flushPromises()
+
+    expect(store.posts[0]).toMatchObject({ favorited: false })
+    expect(wrapper.find('[data-action="favorite"]').classes()).not.toContain('is-favorited')
+    expect(wrapper.emitted('favorite')).toEqual([['p-1']])
+  })
+
+  it('收藏失败时回滚状态、提示错误且不发出事件', async () => {
+    seedApi([makePost({ favorited: false })])
+    const store = useForumStore(pinia)
+    await flushPromises()
+    const wrapper = mount(PostCard, {
+      props: { post: store.posts[0]! },
+      global: { plugins: [pinia] },
+    })
+    failNextRequests(1)
+
+    await wrapper.find('[data-action="favorite"]').trigger('click')
+    await flushPromises()
+
+    expect(store.posts[0]).toMatchObject({ favorited: false })
+    expect(wrapper.find('[data-action="favorite"]').classes()).not.toContain('is-bumping')
+    expect(wrapper.emitted('favorite')).toBeUndefined()
+    expect(useToast().message.value).toBe('操作失败，请稍后再试')
+  })
+
   it('确认后删除自己的动态', async () => {
     seedApi([makePost({ id: 'mine', authorId: 'user-me' })], { id: 'user-me', name: '我' })
     const store = useForumStore(pinia)

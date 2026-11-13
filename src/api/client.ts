@@ -127,6 +127,16 @@ export async function setPostLike(id: string, liked: boolean): Promise<Post> {
   return toPost(payload.post)
 }
 
+export async function setFavorite(id: string, favorited: boolean): Promise<Post> {
+  const payload = asRecord(
+    await request<unknown>(`/posts/${encodeURIComponent(id)}/favorite`, {
+      method: 'PUT',
+      body: JSON.stringify({ favorited }),
+    }),
+  )
+  return toPost(payload.post)
+}
+
 export async function updateUserName(name: string): Promise<User> {
   const payload = asRecord(
     await request<unknown>('/user', {
