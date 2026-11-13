@@ -1,109 +1,121 @@
 # 微波论坛（Microwave Forum）v2.0
 
-一个使用 **Node.js + Vue 3 + Pinia** 重写的轻量微社区单页应用。数据仍然只保存在浏览器 `localStorage`，没有后端、没有账号体系，刷新或重开浏览器后内容依然在。
+一个 **Vue 3 + Pinia + Hono** 的轻量微社区单页应用。前端通过 REST API 访问本地 **Hono 服务**，数据保存在**服务端内存**中：刷新页面不会丢，重启服务后重新播种示例内容。
 
-v2.0 是对 v1.x（纯 HTML + CSS + 原生 JS）的完整重写，行为与视觉保持一致，但代码按**领域逻辑 / 状态管理 / UI 组件**分层，并以 **TDD（测试先行）** 的方式开发。
+项目按**领域逻辑 / API 客户端 / 状态管理 / UI 组件 / 服务端**分层，前端与后端均以 **TDD（测试先行）** 方式开发。
 
 ## 技术栈
 
 | 层 | 选型 |
 | --- | --- |
 | 运行时 | Node.js ≥ 22.12 |
-| 框架 | Vue 3（Composition API + `<script setup lang="ts">`） |
-| 状态 | Pinia（setup store） |
-| 构建 | Vite |
-| 测试 | Vitest + @vue/test-utils + jsdom |
-| 类型 | TypeScript + vue-tsc |
+| 前端 | Vue 3（Composition API + `<script setup lang="ts">`）、Pinia（setup store） |
+| 构建 | Vite 8 |
+| 后端 | Hono 4 + `@hono/node-server`（内存存储，无数据库） |
+| 运行 TS | tsx（`dev:api` / `start:api`） |
+| 测试 | Vitest 5 + @vue/test-utils + jsdom（服务端测试用 `@vitest-environment node`） |
+| 类型 | TypeScript（strict）+ vue-tsc |
 
 ## 快速开始
 
 ```bash
-npm install       # 安装依赖
-npm run dev       # 本地开发，默认 http://localhost:5173
-npm test          # 跑全部单元 / 组件 / 集成测试（120 个）
-npm run typecheck # 仅做类型检查
-npm run build     # 类型检查 + 生产构建，产物在 dist/
-npm run preview   # 预览生产构建
+npm install
+npm run dev        # 并行启动前端与后端：web http://localhost:5173，api http://127.0.0.1:8787
+npm test           # 全部测试（13 个文件 / 162 个用例）
+npm run typecheck  # 仅类型检查
+npm run build      # 类型检查 + 生产构建，产物在 dist/
+npm run preview    # 预览生产构建（/api 仍代理到 8787）
 ```
+
+只启动其中一端：
+
+```bash
+npm run dev:web    # 仅 Vite
+npm run dev:api    # 仅 Hono（tsx watch）
+```
+
+> `npm run dev` 依赖 `concurrently`；前端通过 Vite 代理把 `/api` 转发到 `127.0.0.1:8787`，因此浏览器里只需要访问 5173。
 
 ## 功能
 
 - 发布文字动态（上限 140 字，实时字数提示，超限禁用发布并抖动提醒），发布时选择板块
 - 时间线按发布时间倒序展示，相对时间显示（刚刚 / N 分钟前 / N 小时前 / N 天前 / 具体日期）
 - 视图切换：实时 / 热门（按点赞排序）/ 我的 / 我赞过的；板块筛选可与视图叠加
-- 点赞 / 取消点赞，数量与状态持久化，并实时反映到热榜与统计
-- 删除自己发布的动态（仅本人可见入口，二次确认 + 淡出动画）
+- 点赞 / 取消点赞（乐观更新 + 失败回滚），数量与状态由服务端保存，并实时反映到热榜与统计
+- 删除自己发布的动态（仅本人可见入口，二次确认 + 淡出动画，服务端校验权限）
 - 关键词搜索（匹配正文、昵称或板块，大小写不敏感），输入即筛，回车/点击搜索给出结果提示
 - 热榜：按点赞排名，支持换一换、查看更多/收起，点击条目自动清空筛选并滚动定位、高亮对应动态
-- 本地昵称修改，修改后同步更新自己已发布的内容
-- 空状态引导、Toast 提示、暗色模式与减少动效适配
-- 本地存储不可用（隐私模式 / 配额满）时自动降级为内存态并给出提示
+- 昵称修改，服务端同步更新本人已发布内容的作者名
+- 空状态引导、Toast 提示、加载中占位、暗色模式与减少动效适配
+- 后端不可用时给出「无法连接服务」提示，不会把网络故障误报成空社区
 
 ## 目录结构
 
 ```
 .
-├── index.html                 # Vite 入口，仅保留挂载点
-├── styles.css                 # 主题、三栏布局、动画与响应式样式（沿用 v1.x）
-├── vite.config.ts             # Vite + Vitest 配置
-├── tsconfig.json
-├── legacy/                    # v1.x 纯 HTML 实现归档，可直接用浏览器打开
-│   ├── index.html
-│   └── app.js
-└── src/
-    ├── main.ts                # 创建应用、注册 Pinia、引入全局样式
-    ├── App.vue                # 页面布局装配与跨组件协作（弹层、滚动定位、空状态动作）
-    ├── domain/                # 纯函数领域逻辑，零 Vue 依赖
-    │   ├── types.ts           # Post / User / Topic / ViewMode
-    │   ├── constants.ts       # 字数上限、板块、存储 key、头像调色板
-    │   ├── text.ts            # 字数统计、截断、首字、颜色哈希
-    │   ├── time.ts            # 相对时间 / 完整时间格式化
-    │   ├── posts.ts           # 数据规范化、示例数据、筛选、排序
-    │   ├── hot.ts             # 热榜排名与「换一换」轮转
-    │   ├── empty.ts           # 空状态文案
-    │   └── id.ts              # id 生成
-    ├── storage/
-    │   └── localStore.ts      # localStorage 读写封装（失败降级）
-    ├── stores/
-    │   └── forum.ts           # Pinia store：动态、身份、筛选、热榜、持久化
-    ├── composables/
-    │   └── useToast.ts        # 全局 Toast
-    ├── components/            # 展示与交互组件
-    │   ├── TopBar.vue         # 品牌栏、本地统计、身份入口
-    │   ├── HeroSection.vue    # Hero 文案、通栏搜索、数据统计
-    │   ├── SideNav.vue        # 视图导航与板块筛选
-    │   ├── ComposerCard.vue   # 发布卡（板块选择、字数、快捷键）
-    │   ├── TimelinePanel.vue  # 视图 Tab、条数、时间线、定位
-    │   ├── PostCard.vue       # 单条动态（点赞、删除、高亮）
-    │   ├── EmptyState.vue     # 空状态
-    │   ├── HotBoard.vue       # 微波热榜
-    │   ├── PromoCard.vue      # 本地版推广卡
-    │   ├── MiniTip.vue        # 小提示
-    │   ├── UserDialog.vue     # 昵称弹层（原生 dialog）
-    │   ├── ToastMessage.vue   # Toast 渲染
-    │   ├── AppAvatar.vue      # 渐变头像
-    │   ├── AppIcon.vue        # 统一图标
-    │   └── icon-paths.ts
-    ├── test/
-    │   ├── setup.ts           # jsdom 环境补齐（scrollIntoView / dialog）
-    │   └── helpers.ts         # 测试夹具
-    └── **/*.test.ts           # 与实现同目录的测试
+├── server/                    # Hono 后端（内存存储）
+│   ├── store.ts               # createMemoryStore：动态、用户、播种、点赞/删除/改名规则
+│   ├── app.ts                 # createApp：REST 路由、校验、错误码、请求体上限
+│   ├── index.ts               # 启动入口（PORT 默认 8787）
+│   └── app.test.ts            # 后端契约测试（node 环境，app.request）
+├── src/
+│   ├── main.ts
+│   ├── App.vue                # 布局装配与跨组件协作（弹层、滚动定位、连接提示）
+│   ├── api/
+│   │   ├── client.ts          # fetch 封装、超时、错误码、响应形状校验
+│   │   └── client.test.ts
+│   ├── domain/                # 纯函数领域逻辑，零 Vue 依赖
+│   │   ├── types.ts           # Post / User / Topic / ViewMode
+│   │   ├── constants.ts       # 字数上限、板块、头像调色板
+│   │   ├── text.ts / time.ts  # 字数、截断、相对时间
+│   │   ├── posts.ts           # 规范化、示例数据、筛选、排序
+│   │   ├── hot.ts             # 热榜排名与轮转
+│   │   └── empty.ts           # 空状态文案
+│   ├── stores/
+│   │   └── forum.ts           # 唯一数据源：hydrate + 异步写操作 + 派生状态
+│   ├── composables/useToast.ts
+│   ├── components/            # 展示与交互组件
+│   ├── test/
+│   │   ├── fakeApi.ts         # 内存假后端（vi.stubGlobal('fetch')）
+│   │   ├── helpers.ts         # 测试夹具
+│   │   └── setup.ts           # jsdom 环境补齐
+│   └── **/*.test.ts
+├── legacy/                    # v1.x 纯 HTML 实现归档
+├── styles.css
+└── vite.config.ts             # 别名、/api 代理、Vitest 配置
 ```
 
 ## 数据流与分层
 
 ```
-localStorage ──read/write──> storage/localStore ──> stores/forum.ts（唯一数据源）
-                                                          │
-                                          computed：visiblePosts / hotBoard / stats / navCounts
-                                                          │
-             App.vue ── props & events ──> 展示组件（Composer / Timeline / HotBoard / ...）
+浏览器组件 ──> stores/forum.ts ──> api/client.ts ──fetch──> Hono /api
+                   │                                          │
+                   └── computed：visiblePosts / hotBoard / stats / navCounts
+                                                                  │
+                                                       server/store.ts（内存）
 ```
 
-- **domain/**：纯函数，方便先写测试再实现，也不依赖浏览器
-- **stores/forum.ts**：唯一可变状态；所有写操作（发布、点赞、删除、改名、筛选、热榜）都在这里统一持久化
-- **组件**：通过 props 接收数据、通过事件向外冒泡；只保留与自身交互强相关的 DOM 行为（输入、动画、滚动）
-- **App.vue**：负责布局装配与跨组件协作（如空状态「去发布」→ 聚焦发布框；热榜点击 → 时间线定位）
+- **server/store.ts**：进程内单用户数据源，播种 3 条示例动态；重启即重置。
+- **server/app.ts**：只做 HTTP 协议层——解析、校验、状态码映射，不含业务规则。
+- **api/client.ts**：统一超时（8s）、把网络失败归一为 `ApiError(0)`、拒绝结构不符的响应。
+- **stores/forum.ts**：唯一可变状态；`hydrate()` 首屏拉取，写操作异步化并处理失败回滚。
+- **组件**：props + 事件，自身只保留输入、动画、滚动等 DOM 行为。
+
+## REST API
+
+Base：`/api`，请求/响应均为 JSON；错误统一 `{ "error": "<code>" }`。
+
+| 方法 | 路径 | 说明 | 成功 | 失败 |
+| --- | --- | --- | --- | --- |
+| GET | `/health` | 健康检查 | 200 `{ ok: true }` | — |
+| GET | `/posts` | 全部动态，按 createdAt 倒序 | 200 `{ posts }` | — |
+| POST | `/posts` | `{ content, topic? }` | 201 `{ post }` | 400 `content-empty` / `content-too-long` / `invalid-body`；413 `payload-too-large` |
+| DELETE | `/posts/:id` | 删除本人动态 | 204 | 403 `forbidden`；404 `not-found` |
+| PUT | `/posts/:id/like` | `{ liked: boolean }`，幂等 | 200 `{ post }` | 400 `invalid-body`；404 `not-found` |
+| GET | `/user` | 当前身份 | 200 `{ user }` | — |
+| PATCH | `/user` | `{ name }`，自动截断到 12 字符并同步本人动态作者名 | 200 `{ user }` | 400 `name-empty` / `invalid-body` |
+
+其他 `/api/*` 返回 404 `{ error: 'not-found' }`；未捕获异常返回 500 `{ error: 'internal' }`，不暴露堆栈。
 
 ## 测试（TDD）
 
@@ -111,37 +123,27 @@ localStorage ──read/write──> storage/localStore ──> stores/forum.ts�
 
 | 测试文件 | 数量 | 覆盖内容 |
 | --- | --- | --- |
-| `src/domain/text.test.ts` | 11 | emoji 字数、截断、首字、头像哈希 |
-| `src/domain/time.test.ts` | 6 | 相对时间、跨年、完整时间补零 |
-| `src/domain/posts.test.ts` | 18 | 数据规范化、示例数据、筛选叠加、排序 |
-| `src/domain/hot.test.ts` | 7 | 排名、折叠/展开、换一换轮转 |
-| `src/domain/empty.test.ts` | 6 | 各场景空状态文案与动作 |
-| `src/stores/forum.test.ts` | 27 | 读写存储、发布校验、点赞、删除权限、改名、统计、热榜 |
-| `src/components/*.test.ts` | 31 | 发布卡、动态卡、时间线、热榜的渲染与交互 |
-| `src/App.test.ts` | 14 | 全流程集成：发布 / 搜索 / 筛选 / 改名 / 定位 / 刷新持久化 / 结构类名 |
+| `server/app.test.ts` | 25 | 全部端点契约、状态码、字段完整、倒序、幂等点赞、越权删除、改名同步、实例隔离、请求体上限 |
+| `src/api/client.test.ts` | 5 | 响应解析、结构不符报错、错误码透传、网络异常归一 |
+| `src/domain/*.test.ts` | 48 | 字数/时间/规范化/筛选/排序/热榜/空状态 |
+| `src/stores/forum.test.ts` | 32 | hydrate、发布校验、点赞幂等与竞态、删除权限、改名、筛选/统计、热榜、网络失败 |
+| `src/components/*.test.ts` | 36 | 发布卡、动态卡、时间线、热榜的渲染与异步交互 |
+| `src/App.test.ts` | 16 | 集成流程：发布 / 搜索 / 筛选 / 改名 / 点赞 / 删除 / 定位 / 重新拉取 / 加载与断连态 |
 
-最近一次完整验收：
+最近一次验收：
 
 ```
-Test Files  11 passed (11)
-     Tests  120 passed (120)
+Test Files  13 passed (13)
+     Tests  162 passed (162)
 vue-tsc --noEmit  通过
 vite build        通过
 ```
 
-## 数据存储
+## 存储说明
 
-沿用 v1.x 的 key，旧数据可直接读取，无需迁移：
-
-| Key | 说明 |
-| --- | --- |
-| `mwb.posts.v1` | 全部动态数组，元素含 `id / authorId / author / topic / content / createdAt / likes / likedByMe` |
-| `mwb.user.v1` | 当前本地身份（`id` 与昵称） |
-
-- 首次访问写入 3 条示例动态（`seed-*`）。
-- 读取时会做规范化：缺失字段补默认值、非法板块回落为「随笔」、点赞数不为负、没有正文的条目丢弃；损坏的 JSON 会回落到示例内容。
-- 写入失败（隐私模式 / 配额满）时降级为内存态，并通过 Toast 提示。
-- 清空数据：浏览器开发者工具 → Application → Local Storage → 删除上述两个 key，刷新后恢复初始示例内容。
+- 数据只存在于 Hono 进程内存：**刷新浏览器不丢，重启后端回到 3 条示例动态**。
+- 没有数据库、没有账号体系，服务端只维护一个本地身份；多标签页共享同一份数据。
+- 清空数据：重启 `npm run dev:api`。
 
 ## 响应式
 
@@ -150,15 +152,15 @@ vite build        通过
 | > 1180px | 左栏 + 中栏 + 右栏三栏并排 |
 | 900 ~ 1180px | 左栏折叠为横向胶囊按钮条，中栏 + 右栏两栏 |
 | < 900px | 单栏纵向：导航胶囊条 → 发布与动态流 → 热榜与推广卡 |
-| < 640px | 均为单列，按钮与输入框适配触控尺寸，无横向滚动 |
+| < 640px | 单列，按钮与输入框适配触控尺寸，无横向滚动 |
 
 ## 更新日志
 
-- **v2.0**：使用 Vue 3 + TypeScript + Pinia 重写，按领域逻辑 / 状态管理 / 组件分层；新增 Vitest 测试体系（120 个测试）与类型检查；数据 key 与交互行为保持兼容。旧版纯 HTML 实现归档到 `legacy/`。
+- **v2.0**：从 localStorage 迁移到 **Hono + REST + 内存存储**。新增 `server/`（store / app / 入口）与 `src/api/client.ts`；store 写操作异步化并支持失败回滚、点赞请求串行化、加载态与断连提示；测试从 120 增至 162，新增服务端契约测试与假后端。旧的 `src/storage/localStore.ts` 与 `STORAGE_KEYS` 已移除。
 - **v1.1**：新增左右侧栏、顶部通栏搜索条、视图 Tab、板块字段与热榜定位交互；三栏响应式断点。
 - **v1.0**：首个版本，单列信息流 + 发布 / 点赞 / 删除 / 搜索 / 本地昵称。
 
 ## 说明
 
 - 所有用户文本都通过 Vue 模板插值渲染（等价于 `textContent`），不会执行 HTML，从根本避免 XSS。
-- 本项目仅用于本地演示，没有后端与账号体系，数据不会离开本机浏览器。
+- 后端无鉴权，仅供本地演示；如需多用户，请在 `server/` 增加会话与鉴权中间件。

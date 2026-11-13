@@ -7,6 +7,7 @@ import { useForumStore } from '@/stores/forum'
 import EmptyState from './EmptyState.vue'
 import PostCard from './PostCard.vue'
 
+const props = withDefaults(defineProps<{ loading?: boolean }>(), { loading: false })
 const emit = defineEmits<{ action: [kind: EmptyAction] }>()
 
 const store = useForumStore()
@@ -84,7 +85,8 @@ defineExpose({ focusPost, scrollToFeed })
     class="timeline"
     aria-live="polite"
     aria-label="动态时间线">
-    <template v-if="visiblePosts.length">
+    <p v-if="props.loading" class="timeline__loading" aria-live="polite">正在加载动态…</p>
+    <template v-else-if="visiblePosts.length">
       <PostCard
         v-for="(post, index) in visiblePosts"
         :key="post.id"

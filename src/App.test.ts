@@ -4,13 +4,19 @@ import type { Pinia } from 'pinia'
 import App from '@/App.vue'
 import { useToast } from '@/composables/useToast'
 import { useForumStore } from '@/stores/forum'
-import { freshPinia, makePost, seedStorage } from '@/test/helpers'
+import {
+  failNextRequests,
+  freshPinia,
+  installFakeApi,
+  makePost,
+  seedApi,
+} from '@/test/helpers'
 
 let pinia: Pinia
 let wrapper: ReturnType<typeof mount> | null = null
 
 beforeEach(() => {
-  localStorage.clear()
+  installFakeApi()
   useToast().hide()
   pinia = freshPinia()
 })
@@ -22,14 +28,15 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function mountApp() {
+async function mountApp() {
   wrapper = mount(App, { global: { plugins: [pinia] }, attachTo: document.body })
+  await flushPromises()
   return wrapper
 }
 
 describe('App 整体行为', () => {
-  it('首次访问渲染示例内容与全部统计', () => {
-    const app = mountApp()
+  it('首次访问渲染示例内容与全部统计', async () => {
+    const app = await mountApp()
 
     expect(app.findAll('.post')).toHaveLength(3)
     expect(app.find('#statPosts').text()).toBe('3')
@@ -42,12 +49,23 @@ describe('App 整体行为', () => {
     expect(counts).toEqual(['3', '3', '0', '0'])
   })
 
+  it('加载完成前展示加载提示而不是空状态', async () => {
+    wrapper = mount(App, { global: { plugins: [pinia] }, attachTo: document.body })
+
+    expect(wrapper.find('.timeline__loading').exists()).toBe(true)
+    expect(wrapper.find('.empty__title').exists()).toBe(false)
+
+    await flushPromises()
+    expect(wrapper.findAll('.post')).toHaveLength(3)
+  })
+
   it('发布动态后置顶并更新统计与提示', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const store = useForumStore(pinia)
 
     await app.find('#composerInput').setValue('今天的微波有点暖')
     await app.find('#publishBtn').trigger('click')
+    await flushPromises()
 
     expect(store.posts).toHaveLength(4)
     expect(app.find('.post .post__body').text()).toBe('今天的微波有点暖')
@@ -58,7 +76,7 @@ describe('App 整体行为', () => {
   })
 
   it('搜索即时过滤，提交后提示结果数量', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const search = app.find('#searchInput')
 
     await search.setValue('茶叶')
@@ -76,7 +94,7 @@ describe('App 整体行为', () => {
   })
 
   it('左侧导航切换视图与板块', async () => {
-    const app = mountApp()
+    const app = await mountApp()
 
     await app.find('.nav-item[data-view="mine"]').trigger('click')
     expect(app.find('.empty__title').text()).toBe('你还没有发布过')
@@ -91,7 +109,7 @@ describe('App 整体行为', () => {
   })
 
   it('空状态「去发布」会聚焦输入框', async () => {
-    const app = mountApp()
+    const app = await mountApp()
 
     await app.find('.nav-item[data-view="mine"]').trigger('click')
     await app.find('[data-action="empty-cta"]').trigger('click')
@@ -100,17 +118,18 @@ describe('App 整体行为', () => {
   })
 
   it('修改昵称会同步自己的动态并关闭弹层', async () => {
-    seedStorage([makePost({ id: 'mine', authorId: 'user-me', author: '旧昵称' })], {
+    seedApi([makePost({ id: 'mine', authorId: 'user-me', author: '旧昵称' })], {
       id: 'user-me',
       name: '旧昵称',
     })
-    const app = mountApp()
+    const app = await mountApp()
 
     await app.find('#editUserBtn').trigger('click')
     expect((app.find('#userDialog').element as HTMLDialogElement).open).toBe(true)
 
     await app.find('#userNameInput').setValue('微波新客')
     await app.find('#userForm').trigger('submit')
+    await flushPromises()
 
     expect(app.find('#userName').text()).toBe('微波新客')
     expect(app.find('.post__name').text()).toContain('微波新客')
@@ -119,20 +138,21 @@ describe('App 整体行为', () => {
   })
 
   it('空昵称不会保存', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const store = useForumStore(pinia)
     const original = store.user.name
 
     await app.find('#editUserBtn').trigger('click')
     await app.find('#userNameInput').setValue('   ')
     await app.find('#userForm').trigger('submit')
+    await flushPromises()
 
     expect(store.user.name).toBe(original)
     expect(app.find('.toast').text()).toBe('昵称不能为空')
   })
 
   it('热榜条目会定位到对应动态并高亮', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const store = useForumStore(pinia)
     const targetId = store.hotBoard.items[0]!.id
 
@@ -145,35 +165,48 @@ describe('App 整体行为', () => {
   })
 
   it('推广卡按钮聚焦发布框', async () => {
-    const app = mountApp()
+    const app = await mountApp()
 
     await app.find('#promoBtn').trigger('click')
     expect(document.activeElement).toBe(app.find('#composerInput').element)
   })
 
   it('点赞会同步统计与热榜计数', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const store = useForumStore(pinia)
     const first = app.find('.post')
 
     await first.find('[data-action="like"]').trigger('click')
+    await flushPromises()
 
     expect(store.posts.find((post) => post.id === first.attributes('data-id'))!.likedByMe).toBe(true)
     expect(app.find('#statLikes').text()).toBe('48')
     expect(app.find('#feedCount').text()).toBe('共 3 条')
   })
 
+  it('后端不可用时给出连接失败提示', async () => {
+    failNextRequests(2)
+    const app = await mountApp()
+
+    expect(app.find('.toast').text()).toBe('无法连接服务，请确认后端已启动')
+    expect(app.find('#statPosts').text()).toBe('0')
+    expect(app.find('.empty__title').exists()).toBe(true)
+  })
+
   it('删除自己的动态后列表与统计同步更新', async () => {
-    vi.useFakeTimers()
-    seedStorage([makePost({ id: 'mine', authorId: 'user-me', content: '待删除' })], {
+    seedApi([makePost({ id: 'mine', authorId: 'user-me', content: '待删除' })], {
       id: 'user-me',
       name: '我',
     })
+    useForumStore(pinia)
+    await flushPromises()
+    vi.useFakeTimers()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const app = mountApp()
 
+    wrapper = mount(App, { global: { plugins: [pinia] }, attachTo: document.body })
+    const app = wrapper
     await app.find('.post [data-action="delete"]').trigger('click')
-    vi.advanceTimersByTime(300)
+    await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
 
     expect(app.findAll('.post')).toHaveLength(0)
@@ -181,7 +214,7 @@ describe('App 整体行为', () => {
   })
 
   it('滚动时顶栏进入紧凑状态', async () => {
-    const app = mountApp()
+    const app = await mountApp()
     const topbar = app.find('#topbar')
 
     Object.defineProperty(window, 'scrollY', { value: 120, configurable: true })
@@ -195,19 +228,21 @@ describe('App 整体行为', () => {
     expect(topbar.classes()).not.toContain('is-scrolled')
   })
 
-  it('刷新页面后动态、点赞与昵称依然保留', async () => {
-    const first = mountApp()
+  it('刷新页面后重新拉取，动态、点赞与昵称依然保留', async () => {
+    const first = await mountApp()
 
     await first.find('#composerInput').setValue('刷新也要在')
     await first.find('#publishBtn').trigger('click')
+    await flushPromises()
     await first.find('.post [data-action="like"]').trigger('click')
+    await flushPromises()
 
     first.unmount()
     wrapper = null
 
-    // 重新创建 Pinia 实例，等价于刷新后重新从 localStorage 读取
+    // 新建 Pinia 等价于刷新页面：数据仍由后端提供
     pinia = freshPinia()
-    const second = mountApp()
+    const second = await mountApp()
 
     expect(second.find('.post .post__body').text()).toBe('刷新也要在')
     expect(second.find('.post [data-action="like"]').attributes('aria-pressed')).toBe('true')
@@ -215,8 +250,8 @@ describe('App 整体行为', () => {
     expect(second.find('#quickStats').text()).toContain('4 条动态')
   })
 
-  it('页面结构与旧版样式表使用的类名保持一致', () => {
-    const app = mountApp()
+  it('页面结构与旧版样式表使用的类名保持一致', async () => {
+    const app = await mountApp()
 
     expect(app.find('.backdrop .orb--one').exists()).toBe(true)
     expect(app.find('.page .hero').exists()).toBe(true)

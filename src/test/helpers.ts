@@ -1,6 +1,5 @@
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { STORAGE_KEYS } from '@/domain/constants'
-import type { Post, User } from '@/domain/types'
+import type { Post } from '@/domain/types'
 
 export const TEST_NOW = new Date(2026, 2, 5, 12, 0, 0).getTime()
 
@@ -18,10 +17,13 @@ export function makePost(overrides: Partial<Post> = {}): Post {
   }
 }
 
-export function seedStorage(posts: Post[] | null, user: User | null = null): void {
-  if (posts) localStorage.setItem(STORAGE_KEYS.posts, JSON.stringify(posts))
-  if (user) localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
-}
+export {
+  apiPosts,
+  apiUser,
+  failNextRequests,
+  installFakeApi,
+  seedApi,
+} from './fakeApi'
 
 /** 每个测试用独立的 Pinia 实例，避免 store 之间串状态 */
 export function freshPinia(): Pinia {

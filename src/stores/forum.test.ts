@@ -1,14 +1,12 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHAR_LIMIT, DEFAULT_TOPIC, DEFAULT_USER_NAME, STORAGE_KEYS, TOPICS } from '@/domain/constants'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { CHAR_LIMIT, DEFAULT_TOPIC, DEFAULT_USER_NAME, TOPICS } from '@/domain/constants'
 import type { Post } from '@/domain/posts'
 import { useForumStore } from '@/stores/forum'
+import { apiPosts, apiUser, failNextRequests, installFakeApi, seedApi } from '@/test/fakeApi'
 
 const NOW = new Date(2026, 2, 5, 12, 0, 0).getTime()
-
-function readStoredPosts(): Post[] {
-  return JSON.parse(localStorage.getItem(STORAGE_KEYS.posts) ?? '[]') as Post[]
-}
 
 function storedPost(overrides: Partial<Post> = {}): Post {
   return {
@@ -16,7 +14,7 @@ function storedPost(overrides: Partial<Post> = {}): Post {
     authorId: 'user-me',
     author: '微波过客',
     topic: '随笔',
-    content: '来自本地存储',
+    content: '来自后端的数据',
     createdAt: NOW,
     likes: 2,
     likedByMe: false,
@@ -24,76 +22,81 @@ function storedPost(overrides: Partial<Post> = {}): Post {
   }
 }
 
-function seedStorage(posts: Post[], user?: { id: string; name: string }) {
-  localStorage.setItem(STORAGE_KEYS.posts, JSON.stringify(posts))
-  if (user) localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
+async function createStore() {
+  const store = useForumStore()
+  await flushPromises()
+  return store
 }
 
 beforeEach(() => {
-  localStorage.clear()
+  installFakeApi()
   setActivePinia(createPinia())
 })
 
-describe('数据加载与持久化', () => {
-  it('首次访问写入 3 条示例动态与本地身份', () => {
+describe('数据加载', () => {
+  it('首次加载从后端拉取 3 条示例动态与当前身份', async () => {
     const store = useForumStore()
+    expect(store.loading).toBe(true)
 
+    await flushPromises()
+
+    expect(store.loading).toBe(false)
+    expect(store.apiAvailable).toBe(true)
     expect(store.posts).toHaveLength(3)
-    expect(readStoredPosts()).toHaveLength(3)
+    expect(apiPosts()).toHaveLength(3)
     expect(store.user.name).toBe(DEFAULT_USER_NAME)
     expect(store.user.id).toEqual(expect.any(String))
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.user)!)).toEqual(store.user)
-    expect(store.storageAvailable).toBe(true)
+    expect(apiUser().id).toBe(store.user.id)
   })
 
-  it('已有数据时按存储内容恢复，不再写入示例', () => {
-    seedStorage([storedPost({ id: 'only-one' })], { id: 'local-user', name: '本机用户' })
+  it('后端已有数据时按返回内容恢复，不再播种', async () => {
+    seedApi([storedPost({ id: 'only-one' })], { id: 'local-user', name: '本机用户' })
 
-    const store = useForumStore()
+    const store = await createStore()
 
     expect(store.posts.map((post) => post.id)).toEqual(['only-one'])
     expect(store.user).toEqual({ id: 'local-user', name: '本机用户' })
-    expect(readStoredPosts()).toHaveLength(1)
   })
 
-  it('存储内容损坏时回落为示例内容', () => {
-    localStorage.setItem(STORAGE_KEYS.posts, '{ not json')
-    const store = useForumStore()
+  it('后端返回空列表时展示 0 条，不回落为示例内容', async () => {
+    seedApi([], { id: 'user-me', name: '我' })
 
-    expect(store.posts).toHaveLength(3)
+    const store = await createStore()
+
+    expect(store.posts).toHaveLength(0)
+    expect(store.stats.posts).toBe(0)
   })
 
-  it('本地身份缺少 id 时补齐并写回', () => {
-    seedStorage([storedPost()], { id: '', name: '旧昵称' })
-    const store = useForumStore()
+  it('后端不可用时降级为空数据并标记 apiAvailable=false', async () => {
+    failNextRequests(2)
 
-    expect(store.user.name).toBe('旧昵称')
-    expect(store.user.id).toEqual(expect.any(String))
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.user)!).id).toBe(store.user.id)
+    const store = await createStore()
+
+    expect(store.loading).toBe(false)
+    expect(store.apiAvailable).toBe(false)
+    expect(store.posts).toEqual([])
   })
 
-  it('存储写入失败时降级为内存态但不影响使用', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('quota exceeded')
-    })
+  it('昵称超长时按 12 个字符截断', async () => {
+    seedApi([storedPost()], { id: 'me', name: '我' })
+    const store = await createStore()
 
-    const store = useForumStore()
-    store.publish('依然可以发布')
+    await store.renameUser('一二三四五六七八九十十一十二十三')
 
-    expect(store.storageAvailable).toBe(false)
-    expect(store.posts[0]!.content).toBe('依然可以发布')
+    expect(Array.from(store.user.name)).toHaveLength(12)
+    expect(apiUser().name).toBe('一二三四五六七八九十十一')
   })
 })
 
 describe('发布动态', () => {
-  it('发布后置顶、写入存储，并回到实时视图', () => {
-    const store = useForumStore()
+  it('发布后置顶、写入后端，并回到实时视图', async () => {
+    const store = await createStore()
     store.setView('hot')
     store.setTopic('科技')
     store.setQuery('关键词')
     store.setComposeTopic('生活')
 
-    const result = store.publish('  新的一条动态  ')
+    const result = await store.publish('  新的一条动态  ')
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -109,138 +112,191 @@ describe('发布动态', () => {
     expect(store.view).toBe('live')
     expect(store.topic).toBe('')
     expect(store.query).toBe('')
-    expect(readStoredPosts()[0]!.content).toBe('新的一条动态')
+    expect(apiPosts()[0]!.content).toBe('新的一条动态')
   })
 
-  it('空内容与全空白内容被拒绝', () => {
-    const store = useForumStore()
-    expect(store.publish('')).toEqual({ ok: false, reason: 'empty' })
-    expect(store.publish('   \n  ')).toEqual({ ok: false, reason: 'empty' })
+  it('空内容与全空白内容被拒绝', async () => {
+    const store = await createStore()
+
+    expect(await store.publish('')).toEqual({ ok: false, reason: 'empty' })
+    expect(await store.publish('   \n  ')).toEqual({ ok: false, reason: 'empty' })
     expect(store.posts).toHaveLength(3)
   })
 
-  it('超过 140 字被拒绝，正好 140 字可以发布', () => {
-    const store = useForumStore()
+  it('超过 140 字被拒绝，正好 140 字可以发布', async () => {
+    const store = await createStore()
 
-    expect(store.publish('字'.repeat(CHAR_LIMIT + 1))).toEqual({ ok: false, reason: 'too-long' })
+    expect(await store.publish('字'.repeat(CHAR_LIMIT + 1))).toEqual({
+      ok: false,
+      reason: 'too-long',
+    })
     expect(store.posts).toHaveLength(3)
 
-    expect(store.publish('字'.repeat(CHAR_LIMIT)).ok).toBe(true)
+    expect((await store.publish('字'.repeat(CHAR_LIMIT))).ok).toBe(true)
     expect(store.posts[0]!.content).toHaveLength(CHAR_LIMIT)
   })
 
-  it('emoji 超限按字符数判断', () => {
-    const store = useForumStore()
-    expect(store.publish('🍵'.repeat(CHAR_LIMIT + 1))).toEqual({ ok: false, reason: 'too-long' })
-    expect(store.publish('🍵'.repeat(CHAR_LIMIT)).ok).toBe(true)
+  it('emoji 超限按字符数判断', async () => {
+    const store = await createStore()
+
+    expect(await store.publish('🍵'.repeat(CHAR_LIMIT + 1))).toEqual({
+      ok: false,
+      reason: 'too-long',
+    })
+    expect((await store.publish('🍵'.repeat(CHAR_LIMIT))).ok).toBe(true)
+  })
+
+  it('网络失败时返回 network 且不新增动态', async () => {
+    const store = await createStore()
+    const before = store.posts.length
+    failNextRequests(1)
+
+    expect(await store.publish('发不出去')).toEqual({ ok: false, reason: 'network' })
+    expect(store.posts).toHaveLength(before)
+    expect(store.apiAvailable).toBe(false)
   })
 })
 
 describe('点赞', () => {
-  it('点赞与取消点赞同步数量、状态与存储', () => {
-    seedStorage([storedPost()])
-    const store = useForumStore()
+  it('点赞与取消点赞同步数量、状态与后端', async () => {
+    seedApi([storedPost()])
+    const store = await createStore()
 
-    expect(store.toggleLike('stored-1')).toBe(true)
+    expect(await store.toggleLike('stored-1')).toBe(true)
     expect(store.posts[0]).toMatchObject({ likes: 3, likedByMe: true })
-    expect(readStoredPosts()[0]).toMatchObject({ likes: 3, likedByMe: true })
+    expect(apiPosts()[0]).toMatchObject({ likes: 3, likedByMe: true })
 
-    expect(store.toggleLike('stored-1')).toBe(true)
+    expect(await store.toggleLike('stored-1')).toBe(true)
     expect(store.posts[0]).toMatchObject({ likes: 2, likedByMe: false })
-    expect(readStoredPosts()[0]).toMatchObject({ likes: 2, likedByMe: false })
+    expect(apiPosts()[0]).toMatchObject({ likes: 2, likedByMe: false })
   })
 
-  it('点赞数不会小于 0', () => {
-    seedStorage([storedPost({ likes: 0, likedByMe: true })])
-    const store = useForumStore()
+  it('点赞数不会小于 0', async () => {
+    seedApi([storedPost({ likes: 0, likedByMe: true })])
+    const store = await createStore()
 
-    store.toggleLike('stored-1')
+    await store.toggleLike('stored-1')
+
     expect(store.posts[0]!.likedByMe).toBe(false)
     expect(store.posts[0]!.likes).toBe(0)
   })
 
-  it('未知动态返回 false', () => {
-    const store = useForumStore()
-    expect(store.toggleLike('missing')).toBe(false)
+  it('未知动态返回 false', async () => {
+    const store = await createStore()
+    expect(await store.toggleLike('missing')).toBe(false)
   })
 
-  it('点赞后影响统计、导航计数与热榜', () => {
-    seedStorage([storedPost({ id: 'a', likes: 0 }), storedPost({ id: 'b', likes: 5 })])
-    const store = useForumStore()
-    store.toggleLike('a')
+  it('点赞后影响统计、导航计数与热榜', async () => {
+    seedApi([storedPost({ id: 'a', likes: 0 }), storedPost({ id: 'b', likes: 5 })])
+    const store = await createStore()
+
+    await store.toggleLike('a')
 
     expect(store.stats.likes).toBe(6)
     expect(store.navCounts.liked).toBe(1)
     expect(store.hotBoard.items[0]!.id).toBe('b')
     expect(store.hotBoard.items[1]!.likes).toBe(1)
   })
+
+  it('同一动态连点只发出一次请求，不会重复计数', async () => {
+    seedApi([storedPost({ likes: 2, likedByMe: false })])
+    const store = await createStore()
+
+    const results = await Promise.all([store.toggleLike('stored-1'), store.toggleLike('stored-1')])
+
+    expect(results).toEqual([true, false])
+    expect(store.posts[0]).toMatchObject({ likes: 3, likedByMe: true })
+    expect(apiPosts()[0]).toMatchObject({ likes: 3, likedByMe: true })
+  })
+
+  it('网络失败时回滚点赞状态并返回 false', async () => {
+    seedApi([storedPost({ likes: 2, likedByMe: false })])
+    const store = await createStore()
+    failNextRequests(1)
+
+    expect(await store.toggleLike('stored-1')).toBe(false)
+    expect(store.posts[0]).toMatchObject({ likes: 2, likedByMe: false })
+    expect(store.apiAvailable).toBe(false)
+  })
 })
 
 describe('删除动态', () => {
-  it('可以删除自己的动态并持久化', () => {
-    seedStorage([storedPost({ id: 'mine', authorId: 'me' }), storedPost({ id: 'other', authorId: 'other' })], {
+  it('可以删除自己的动态并同步后端', async () => {
+    seedApi([storedPost({ id: 'mine', authorId: 'me' }), storedPost({ id: 'other', authorId: 'other' })], {
       id: 'me',
       name: '我',
     })
-    const store = useForumStore()
+    const store = await createStore()
 
-    expect(store.removePost('mine')).toBe('removed')
+    expect(await store.removePost('mine')).toBe('removed')
     expect(store.posts.map((post) => post.id)).toEqual(['other'])
-    expect(readStoredPosts().map((post) => post.id)).toEqual(['other'])
+    expect(apiPosts().map((post) => post.id)).toEqual(['other'])
   })
 
-  it('不能删除他人的动态', () => {
-    seedStorage([storedPost({ id: 'other', authorId: 'other' })], { id: 'me', name: '我' })
-    const store = useForumStore()
+  it('不能删除他人的动态', async () => {
+    seedApi([storedPost({ id: 'other', authorId: 'other' })], { id: 'me', name: '我' })
+    const store = await createStore()
 
-    expect(store.removePost('other')).toBe('forbidden')
+    expect(await store.removePost('other')).toBe('forbidden')
     expect(store.posts).toHaveLength(1)
   })
 
-  it('删除不存在的动态返回 not-found', () => {
-    seedStorage([storedPost()], { id: 'me', name: '我' })
-    const store = useForumStore()
-    expect(store.removePost('missing')).toBe('not-found')
+  it('删除不存在的动态返回 not-found', async () => {
+    seedApi([storedPost()], { id: 'me', name: '我' })
+    const store = await createStore()
+    expect(await store.removePost('missing')).toBe('not-found')
+  })
+
+  it('网络失败时返回 network 且保留动态', async () => {
+    seedApi([storedPost({ id: 'mine', authorId: 'me' })], { id: 'me', name: '我' })
+    const store = await createStore()
+    failNextRequests(1)
+
+    expect(await store.removePost('mine')).toBe('network')
+    expect(store.posts).toHaveLength(1)
   })
 })
 
 describe('修改昵称', () => {
-  it('更新本人动态的作者名并持久化', () => {
-    seedStorage(
-      [storedPost({ id: 'mine', authorId: 'me', author: '旧名字' }), storedPost({ id: 'other', authorId: 'other', author: '别人' })],
+  it('更新本人动态的作者名并同步后端', async () => {
+    seedApi(
+      [
+        storedPost({ id: 'mine', authorId: 'me', author: '旧名字' }),
+        storedPost({ id: 'other', authorId: 'other', author: '别人' }),
+      ],
       { id: 'me', name: '旧名字' },
     )
-    const store = useForumStore()
+    const store = await createStore()
 
-    expect(store.renameUser(' 新昵称 ')).toEqual({ ok: true })
+    expect(await store.renameUser(' 新昵称 ')).toEqual({ ok: true })
     expect(store.user.name).toBe('新昵称')
     expect(store.posts.find((post) => post.id === 'mine')!.author).toBe('新昵称')
     expect(store.posts.find((post) => post.id === 'other')!.author).toBe('别人')
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.user)!).name).toBe('新昵称')
-    expect(readStoredPosts().find((post) => post.id === 'mine')!.author).toBe('新昵称')
+    expect(apiUser().name).toBe('新昵称')
+    expect(apiPosts().find((post) => post.id === 'mine')!.author).toBe('新昵称')
   })
 
-  it('昵称按字符截断为 12 个字符', () => {
-    seedStorage([storedPost()], { id: 'me', name: '我' })
-    const store = useForumStore()
+  it('空昵称被拒绝', async () => {
+    seedApi([storedPost()], { id: 'me', name: '我' })
+    const store = await createStore()
 
-    store.renameUser('一二三四五六七八九十十一十二十三')
-    expect(store.user.name).toBe('一二三四五六七八九十十一')
-    expect(Array.from(store.user.name)).toHaveLength(12)
+    expect(await store.renameUser('   ')).toEqual({ ok: false, reason: 'empty' })
+    expect(store.user.name).toBe('我')
   })
 
-  it('空昵称被拒绝', () => {
-    seedStorage([storedPost()], { id: 'me', name: '我' })
-    const store = useForumStore()
+  it('网络失败时返回 network 且保留原昵称', async () => {
+    seedApi([storedPost()], { id: 'me', name: '我' })
+    const store = await createStore()
+    failNextRequests(1)
 
-    expect(store.renameUser('   ')).toEqual({ ok: false, reason: 'empty' })
+    expect(await store.renameUser('新昵称')).toEqual({ ok: false, reason: 'network' })
     expect(store.user.name).toBe('我')
   })
 })
 
 describe('筛选、视图与统计', () => {
-  beforeEach(() => {
-    seedStorage(
+  beforeEach(async () => {
+    seedApi(
       [
         storedPost({ id: 'tech', topic: '科技', content: 'Vue 组件', createdAt: NOW, likes: 5 }),
         storedPost({ id: 'life', topic: '生活', content: '晚饭吃什么', createdAt: NOW - 10, likes: 0, likedByMe: true }),
@@ -257,8 +313,8 @@ describe('筛选、视图与统计', () => {
     )
   })
 
-  it('默认实时视图按时间倒序，可切换热门/我的/我赞过的', () => {
-    const store = useForumStore()
+  it('默认实时视图按时间倒序，可切换热门/我的/我赞过的', async () => {
+    const store = await createStore()
     expect(store.visiblePosts.map((post) => post.id)).toEqual(['tech', 'life', 'other'])
 
     store.setView('hot')
@@ -271,8 +327,22 @@ describe('筛选、视图与统计', () => {
     expect(store.visiblePosts.map((post) => post.id)).toEqual(['life'])
   })
 
-  it('板块筛选与搜索可叠加', () => {
-    const store = useForumStore()
+  it('热门视图按点赞降序，与时间顺序不同', async () => {
+    seedApi([
+      storedPost({ id: 'new-low', likes: 0, createdAt: NOW }),
+      storedPost({ id: 'old-high', likes: 9, createdAt: NOW - 1000 }),
+    ])
+    const store = await createStore()
+
+    store.setView('hot')
+    expect(store.visiblePosts.map((post) => post.id)).toEqual(['old-high', 'new-low'])
+
+    store.setView('live')
+    expect(store.visiblePosts.map((post) => post.id)).toEqual(['new-low', 'old-high'])
+  })
+
+  it('板块筛选与搜索可叠加', async () => {
+    const store = await createStore()
     store.setTopic('科技')
     expect(store.visiblePosts.map((post) => post.id)).toEqual(['tech'])
 
@@ -281,8 +351,8 @@ describe('筛选、视图与统计', () => {
     expect(store.visiblePosts.map((post) => post.id)).toEqual(['other'])
   })
 
-  it('导航计数与统计随内容变化', () => {
-    const store = useForumStore()
+  it('导航计数与统计随内容变化', async () => {
+    const store = await createStore()
 
     expect(store.navCounts).toEqual({ live: 3, hot: 1, liked: 1, mine: 2 })
     expect(store.stats).toEqual({
@@ -292,14 +362,14 @@ describe('筛选、视图与统计', () => {
       quick: '本地社区 · 3 条动态 · 5 次点赞',
     })
 
-    store.toggleLike('other')
+    await store.toggleLike('other')
     expect(store.navCounts.hot).toBe(2)
     expect(store.stats.likes).toBe(6)
   })
 
-  it('空数据时计数归零', () => {
-    seedStorage([], { id: 'user-me', name: '我' })
-    const store = useForumStore()
+  it('空数据时计数归零', async () => {
+    seedApi([], { id: 'user-me', name: '我' })
+    const store = await createStore()
 
     expect(store.navCounts).toEqual({ live: 0, hot: 0, liked: 0, mine: 0 })
     expect(store.stats.likes).toBe(0)
@@ -308,7 +378,7 @@ describe('筛选、视图与统计', () => {
 
 describe('热榜交互', () => {
   function seedMany(count: number) {
-    seedStorage(
+    seedApi(
       Array.from({ length: count }, (_, index) =>
         storedPost({
           id: `p-${index}`,
@@ -320,9 +390,9 @@ describe('热榜交互', () => {
     )
   }
 
-  it('默认展示 6 条，展开后展示更多并可收起', () => {
+  it('默认展示 6 条，展开后展示更多并可收起', async () => {
     seedMany(9)
-    const store = useForumStore()
+    const store = await createStore()
 
     expect(store.hotBoard.items).toHaveLength(6)
     expect(store.hotBoard.canToggle).toBe(true)
@@ -335,9 +405,9 @@ describe('热榜交互', () => {
     expect(store.hotBoard.items).toHaveLength(6)
   })
 
-  it('换一换轮转榜单', () => {
+  it('换一换轮转榜单', async () => {
     seedMany(9)
-    const store = useForumStore()
+    const store = await createStore()
     const before = store.hotBoard.items.map((post) => post.id)
 
     store.refreshHot()
@@ -347,9 +417,9 @@ describe('热榜交互', () => {
     expect(store.hotBoard.total).toBe(9)
   })
 
-  it('内容不足 6 条时隐藏「查看更多」', () => {
+  it('内容不足 6 条时隐藏「查看更多」', async () => {
     seedMany(4)
-    const store = useForumStore()
+    const store = await createStore()
     expect(store.hotBoard.canToggle).toBe(false)
     expect(store.hotBoard.items).toHaveLength(4)
   })

@@ -17,7 +17,7 @@ export function normalizeTopic(value: unknown): Topic {
 }
 
 /**
- * 把本地存储里的任意内容整理成合法的动态列表：
+ * 把接口返回的任意内容整理成合法的动态列表：
  * 无效条目丢弃，缺失字段补默认值，非法数值修正。
  */
 export function normalizePosts(raw: unknown): Post[] {

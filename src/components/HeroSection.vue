@@ -37,7 +37,7 @@ defineExpose({ focusSearch })
       <p class="hero__eyebrow">今日热度 · 微波在线</p>
       <h1 id="heroTitle" class="hero__title">把此刻的想法，<br />放进微波里转一圈。</h1>
       <p class="hero__desc">
-        发布、点赞、搜索都在本机完成。内容保存在浏览器本地存储，刷新也不会丢。
+        发布、点赞、搜索都通过本地 Hono 服务完成。内容保存在服务端内存，刷新也不会丢。
       </p>
     </div>
 

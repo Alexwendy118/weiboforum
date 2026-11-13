@@ -12,11 +12,6 @@ export const DRAFT_LIMIT = 200
 /** 昵称长度上限 */
 export const NAME_LIMIT = 12
 
-export const STORAGE_KEYS = {
-  posts: 'mwb.posts.v1',
-  user: 'mwb.user.v1',
-} as const
-
 export const AVATAR_GRADIENTS = [
   'linear-gradient(140deg,#FFC28A,#FF6B2C)',
   'linear-gradient(140deg,#9BD8FF,#2B7CF6)',

@@ -13,6 +13,7 @@ const toast = useToast()
 const dialog = ref<HTMLDialogElement | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const draft = ref('')
+const saving = ref(false)
 
 function showDialog(): void {
   const node = dialog.value
@@ -45,17 +46,28 @@ function requestClose(): void {
   emit('close')
 }
 
-function submit(): void {
-  const result = store.renameUser(draft.value)
+async function submit(): Promise<void> {
+  if (saving.value) return
+  saving.value = true
 
-  if (!result.ok) {
-    toast.show('昵称不能为空')
-    nameInput.value?.focus()
-    return
+  try {
+    const result = await store.renameUser(draft.value)
+
+    if (!result.ok) {
+      if (result.reason === 'network') {
+        toast.show('网络异常，昵称未保存')
+        return
+      }
+      toast.show('昵称不能为空')
+      nameInput.value?.focus()
+      return
+    }
+
+    toast.show('昵称已更新')
+    emit('close')
+  } finally {
+    saving.value = false
   }
-
-  toast.show('昵称已更新')
-  emit('close')
 }
 
 function onBackdropClick(event: MouseEvent): void {
@@ -87,7 +99,7 @@ onBeforeUnmount(() => {
     <form id="userForm" method="dialog" class="sheet__form" @submit.prevent="submit">
       <h2 id="userDialogTitle" class="sheet__title">修改我的昵称</h2>
       <p class="sheet__desc">
-        昵称只保存在本地，最多 {{ NAME_LIMIT }} 个字符。修改后会同步更新你已发布的内容。
+        昵称保存在服务端内存中，最多 {{ NAME_LIMIT }} 个字符。修改后会同步更新你已发布的内容。
       </p>
       <label class="field">
         <span class="field__label">昵称</span>

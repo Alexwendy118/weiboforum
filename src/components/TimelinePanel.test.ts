@@ -1,10 +1,10 @@
-import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Pinia } from 'pinia'
 import TimelinePanel from '@/components/TimelinePanel.vue'
 import { useToast } from '@/composables/useToast'
 import { useForumStore } from '@/stores/forum'
-import { freshPinia, makePost, seedStorage } from '@/test/helpers'
+import { freshPinia, installFakeApi, makePost, seedApi } from '@/test/helpers'
 
 let pinia: Pinia
 
@@ -14,21 +14,26 @@ interface TimelineApi {
 }
 
 beforeEach(() => {
-  localStorage.clear()
+  installFakeApi()
   useToast().hide()
   pinia = freshPinia()
 })
 
-function mountPanel() {
-  return mount(TimelinePanel, { global: { plugins: [pinia] } })
+async function mountPanel(loading = false) {
+  const wrapper = mount(TimelinePanel, {
+    props: { loading },
+    global: { plugins: [pinia] },
+  })
+  if (!loading) await flushPromises()
+  return wrapper
 }
 
-function api(wrapper: ReturnType<typeof mountPanel>): TimelineApi {
+function api(wrapper: Awaited<ReturnType<typeof mountPanel>>): TimelineApi {
   return wrapper.vm as unknown as TimelineApi
 }
 
 function seedThree() {
-  seedStorage(
+  seedApi(
     [
       makePost({ id: 'old', content: '较早的一条', createdAt: 1000, likes: 0 }),
       makePost({ id: 'new', content: '最新的一条', createdAt: 3000, likes: 2 }),
@@ -47,9 +52,9 @@ function seedThree() {
 }
 
 describe('TimelinePanel', () => {
-  it('按时间倒序渲染动态并统计条数', () => {
+  it('按时间倒序渲染动态并统计条数', async () => {
     seedThree()
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
     const ids = wrapper.findAll('.post').map((node) => node.attributes('data-id'))
 
     expect(ids).toEqual(['new', 'liked', 'old'])
@@ -58,7 +63,7 @@ describe('TimelinePanel', () => {
 
   it('切换热门视图按点赞排序并同步 tab 状态', async () => {
     seedThree()
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
 
     await wrapper.find('.tab[data-view="hot"]').trigger('click')
 
@@ -73,7 +78,7 @@ describe('TimelinePanel', () => {
 
   it('我的视图只展示自己的内容', async () => {
     seedThree()
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
 
     await wrapper.find('.tab[data-view="mine"]').trigger('click')
 
@@ -86,7 +91,7 @@ describe('TimelinePanel', () => {
   it('搜索词即时过滤，空结果展示引导文案', async () => {
     seedThree()
     const store = useForumStore(pinia)
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
 
     store.setQuery('路人')
     await wrapper.vm.$nextTick()
@@ -103,9 +108,9 @@ describe('TimelinePanel', () => {
   })
 
   it('空状态按钮按场景发出不同的动作', async () => {
-    seedStorage([], { id: 'user-me', name: '微波过客' })
+    seedApi([], { id: 'user-me', name: '微波过客' })
     const store = useForumStore(pinia)
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
 
     await wrapper.find('[data-action="empty-cta"]').trigger('click')
     expect(wrapper.emitted('action')?.[0]).toEqual(['compose'])
@@ -120,7 +125,7 @@ describe('TimelinePanel', () => {
   it('热榜定位会清空筛选并高亮目标动态', async () => {
     seedThree()
     const store = useForumStore(pinia)
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
     const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView')
 
     store.setView('mine')
@@ -140,8 +145,26 @@ describe('TimelinePanel', () => {
 
   it('定位不存在的动态时不会崩溃', async () => {
     seedThree()
-    const wrapper = mountPanel()
+    const wrapper = await mountPanel()
 
     await expect(api(wrapper).focusPost('missing')).resolves.toBeUndefined()
+  })
+
+  it('加载中展示提示而不是空状态', () => {
+    const wrapper = mount(TimelinePanel, {
+      props: { loading: true },
+      global: { plugins: [pinia] },
+    })
+
+    expect(wrapper.find('.timeline__loading').text()).toBe('正在加载动态…')
+    expect(wrapper.find('.empty__title').exists()).toBe(false)
+  })
+
+  it('加载完成后空数据展示空状态', async () => {
+    seedApi([], { id: 'user-me', name: '我' })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('.timeline__loading').exists()).toBe(false)
+    expect(wrapper.find('.empty__title').text()).toBe('这里还很安静')
   })
 })

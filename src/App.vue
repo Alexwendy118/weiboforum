@@ -60,9 +60,11 @@ function onComposeIntent(): void {
 }
 
 watch(
-  () => store.storageAvailable,
+  () => store.apiAvailable,
   (available) => {
-    if (!available) toast.show('本地存储不可用，内容仅保留在本次会话中')
+    if (!available && !store.loading && store.posts.length === 0) {
+      toast.show('无法连接服务，请确认后端已启动')
+    }
   },
   { immediate: true },
 )
@@ -88,7 +90,7 @@ watch(
 
       <section class="col-main" aria-label="核心内容">
         <ComposerCard ref="composer" />
-        <TimelinePanel ref="timeline" @action="onEmptyAction" />
+        <TimelinePanel ref="timeline" :loading="store.loading" @action="onEmptyAction" />
       </section>
 
       <aside class="side side--right" aria-label="热榜与推荐">
@@ -98,7 +100,7 @@ watch(
       </aside>
     </div>
 
-    <p class="page__foot">数据仅保存在此浏览器的本地存储中 · 微波论坛 v2.0</p>
+    <p class="page__foot">数据保存在服务端内存中，重启服务后重置 · 微波论坛 v2.0</p>
   </main>
 
   <UserDialog :open="userDialogOpen" @close="userDialogOpen = false" />

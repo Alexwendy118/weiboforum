@@ -13,6 +13,7 @@ const toast = useToast()
 
 const draft = ref('')
 const shaking = ref(false)
+const publishing = ref(false)
 const input = ref<HTMLTextAreaElement | null>(null)
 let shakeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -40,22 +41,31 @@ function shake(): void {
   }, 460)
 }
 
-function submit(): void {
-  const result = store.publish(draft.value)
+async function submit(): Promise<void> {
+  if (publishing.value) return
+  publishing.value = true
 
-  if (!result.ok) {
-    if (result.reason === 'too-long') {
-      toast.show(`超出 ${CHAR_LIMIT} 字上限，请精简后再试`)
-      shake()
-    } else {
-      toast.show('写点什么再发布吧')
-      focus()
+  try {
+    const result = await store.publish(draft.value)
+
+    if (!result.ok) {
+      if (result.reason === 'too-long') {
+        toast.show(`超出 ${CHAR_LIMIT} 字上限，请精简后再试`)
+        shake()
+      } else if (result.reason === 'network') {
+        toast.show('网络异常，发布失败，请稍后再试')
+      } else {
+        toast.show('写点什么再发布吧')
+        focus()
+      }
+      return
     }
-    return
-  }
 
-  draft.value = ''
-  toast.show(`已发布到「${result.post.topic}」板块`)
+    draft.value = ''
+    toast.show(`已发布到「${result.post.topic}」板块`)
+  } finally {
+    publishing.value = false
+  }
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -67,7 +77,7 @@ function onKeydown(event: KeyboardEvent): void {
     shake()
     return
   }
-  if (canPublish.value) submit()
+  if (canPublish.value) void submit()
 }
 
 onBeforeUnmount(() => clearTimeout(shakeTimer))

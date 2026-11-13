@@ -33,8 +33,11 @@ const fullTime = computed(() => formatFullTime(props.post.createdAt))
 const isoTime = computed(() => new Date(props.post.createdAt).toISOString())
 const animationDelay = computed(() => `${Math.min(props.index, 6) * 0.03}s`)
 
-function onLike(): void {
-  if (!store.toggleLike(props.post.id)) return
+async function onLike(): Promise<void> {
+  if (!(await store.toggleLike(props.post.id))) {
+    toast.show('操作失败，请稍后再试')
+    return
+  }
 
   bumping.value = true
   clearTimeout(bumpTimer)
@@ -43,7 +46,22 @@ function onLike(): void {
   }, 440)
 }
 
+async function confirmRemove(): Promise<void> {
+  const result = await store.removePost(props.post.id)
+
+  if (result === 'removed') {
+    toast.show('已删除')
+    return
+  }
+
+  removing.value = false
+  if (result === 'network') toast.show('网络异常，删除失败，请稍后再试')
+  else if (result === 'forbidden') toast.show('只能删除自己发布的内容')
+  else toast.show('这条动态已经不存在了')
+}
+
 function onDelete(): void {
+  if (removing.value) return
   if (!isMine.value) {
     toast.show('只能删除自己发布的内容')
     return
@@ -53,11 +71,7 @@ function onDelete(): void {
   removing.value = true
   clearTimeout(removeTimer)
   removeTimer = setTimeout(() => {
-    if (store.removePost(props.post.id) === 'removed') {
-      toast.show('已删除')
-    } else {
-      removing.value = false
-    }
+    void confirmRemove()
   }, 260)
 }
 

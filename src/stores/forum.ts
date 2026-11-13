@@ -1,19 +1,18 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
-  CHAR_LIMIT,
-  DEFAULT_TOPIC,
-  DEFAULT_USER_NAME,
-  NAME_LIMIT,
-  STORAGE_KEYS,
-  TOPICS,
-} from '@/domain/constants'
+  ApiError,
+  createPost as apiCreatePost,
+  deletePost as apiDeletePost,
+  fetchPosts,
+  fetchUser,
+  setPostLike,
+  updateUserName,
+} from '@/api/client'
+import { CHAR_LIMIT, DEFAULT_TOPIC, DEFAULT_USER_NAME, NAME_LIMIT, TOPICS } from '@/domain/constants'
 import { buildHotBoard } from '@/domain/hot'
-import { createId } from '@/domain/id'
 import {
-  createSeedPosts,
   filterPosts,
-  normalizePosts,
   sortPostsForView,
   type Post,
   type Topic,
@@ -21,24 +20,16 @@ import {
 } from '@/domain/posts'
 import { clampChars, countChars } from '@/domain/text'
 import type { User } from '@/domain/types'
-import { readJSON, resolveStorage, writeJSON } from '@/storage/localStore'
 
 export type PublishResult =
   | { ok: true; post: Post }
-  | { ok: false; reason: 'empty' | 'too-long' }
+  | { ok: false; reason: 'empty' | 'too-long' | 'network' }
 
-export type RenameResult = { ok: true } | { ok: false; reason: 'empty' }
+export type RenameResult = { ok: true } | { ok: false; reason: 'empty' | 'network' }
 
-export type RemoveResult = 'removed' | 'forbidden' | 'not-found'
-
-interface StoredUser {
-  id?: unknown
-  name?: unknown
-}
+export type RemoveResult = 'removed' | 'forbidden' | 'not-found' | 'network'
 
 export const useForumStore = defineStore('forum', () => {
-  const storage = resolveStorage()
-
   const posts = ref<Post[]>([])
   const user = ref<User>({ id: '', name: DEFAULT_USER_NAME })
   const view = ref<ViewMode>('live')
@@ -47,7 +38,22 @@ export const useForumStore = defineStore('forum', () => {
   const composeTopic = ref<Topic>(DEFAULT_TOPIC)
   const hotOffset = ref(0)
   const hotExpanded = ref(false)
-  const storageAvailable = ref(true)
+  const loading = ref(true)
+  const apiAvailable = ref(true)
+
+  /** 同一动态的点赞请求串行化，避免乱序响应覆盖状态 */
+  const pendingLikes = new Set<string>()
+  /** 加载期间是否已有写操作，避免迟到的 hydrate 覆盖本地结果 */
+  let mutatedWhileLoading = false
+
+  function markSuccess(): void {
+    apiAvailable.value = true
+  }
+
+  function markFailure(error: unknown): void {
+    const offline = error instanceof ApiError && (error.status === 0 || error.status >= 500)
+    if (offline) apiAvailable.value = false
+  }
 
   const stats = computed(() => {
     const likes = posts.value.reduce((sum, post) => sum + post.likes, 0)
@@ -83,99 +89,109 @@ export const useForumStore = defineStore('forum', () => {
     }),
   )
 
-  function persistPosts(): void {
-    if (!writeJSON(storage, STORAGE_KEYS.posts, posts.value)) storageAvailable.value = false
-  }
-
-  function persistUser(): void {
-    if (!writeJSON(storage, STORAGE_KEYS.user, user.value)) storageAvailable.value = false
-  }
-
-  function load(): void {
-    const storedPosts = readJSON<unknown>(storage, STORAGE_KEYS.posts)
-    if (storedPosts === null) {
-      posts.value = createSeedPosts()
-      persistPosts()
-    } else {
-      posts.value = normalizePosts(storedPosts)
-    }
-
-    const storedUser = readJSON<StoredUser>(storage, STORAGE_KEYS.user)
-    const storedName =
-      storedUser && typeof storedUser.name === 'string' ? storedUser.name.trim() : ''
-
-    if (storedUser && storedName) {
-      user.value = {
-        id:
-          typeof storedUser.id === 'string' && storedUser.id ? storedUser.id : createId(),
-        name: clampChars(storedName, NAME_LIMIT),
+  /** 从后端拉取动态与当前身份；失败时保持空态并标记后端不可用 */
+  async function hydrate(): Promise<void> {
+    loading.value = true
+    try {
+      const [nextPosts, nextUser] = await Promise.all([fetchPosts(), fetchUser()])
+      if (!mutatedWhileLoading) {
+        posts.value = nextPosts
+        user.value = nextUser
       }
-    } else {
-      user.value = { id: createId(), name: DEFAULT_USER_NAME }
+      markSuccess()
+    } catch (error) {
+      markFailure(error)
+    } finally {
+      loading.value = false
     }
-
-    if (!storedUser || storedUser.id !== user.value.id) persistUser()
   }
 
-  function publish(content: string): PublishResult {
+  async function publish(content: string): Promise<PublishResult> {
     const text = String(content ?? '').trim()
 
     if (!text) return { ok: false, reason: 'empty' }
     if (countChars(text) > CHAR_LIMIT) return { ok: false, reason: 'too-long' }
 
-    const post: Post = {
-      id: createId(),
-      authorId: user.value.id,
-      author: user.value.name,
-      topic: composeTopic.value,
-      content: text,
-      createdAt: Date.now(),
-      likes: 0,
-      likedByMe: false,
+    try {
+      const post = await apiCreatePost({ content: text, topic: composeTopic.value })
+      posts.value = [post, ...posts.value]
+      mutatedWhileLoading = true
+      markSuccess()
+
+      view.value = 'live'
+      topic.value = ''
+      query.value = ''
+
+      return { ok: true, post }
+    } catch (error) {
+      markFailure(error)
+      return { ok: false, reason: 'network' }
     }
-
-    posts.value = [post, ...posts.value]
-    persistPosts()
-
-    view.value = 'live'
-    topic.value = ''
-    query.value = ''
-
-    return { ok: true, post }
   }
 
-  function toggleLike(id: string): boolean {
+  async function toggleLike(id: string): Promise<boolean> {
+    if (pendingLikes.has(id)) return false
+
     const post = posts.value.find((item) => item.id === id)
     if (!post) return false
 
-    post.likedByMe = !post.likedByMe
-    post.likes = Math.max(0, post.likes + (post.likedByMe ? 1 : -1))
-    persistPosts()
-    return true
+    const before = { likedByMe: post.likedByMe, likes: post.likes }
+    const liked = !before.likedByMe
+    post.likedByMe = liked
+    post.likes = Math.max(0, before.likes + (liked ? 1 : -1))
+    mutatedWhileLoading = true
+    pendingLikes.add(id)
+
+    try {
+      Object.assign(post, await setPostLike(id, liked))
+      markSuccess()
+      return true
+    } catch (error) {
+      post.likedByMe = before.likedByMe
+      post.likes = before.likes
+      markFailure(error)
+      return false
+    } finally {
+      pendingLikes.delete(id)
+    }
   }
 
-  function removePost(id: string): RemoveResult {
+  async function removePost(id: string): Promise<RemoveResult> {
     const post = posts.value.find((item) => item.id === id)
     if (!post) return 'not-found'
     if (post.authorId !== user.value.id) return 'forbidden'
 
-    posts.value = posts.value.filter((item) => item.id !== id)
-    persistPosts()
-    return 'removed'
+    try {
+      await apiDeletePost(id)
+      posts.value = posts.value.filter((item) => item.id !== id)
+      mutatedWhileLoading = true
+      markSuccess()
+      return 'removed'
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return 'forbidden'
+      if (error instanceof ApiError && error.status === 404) return 'not-found'
+      markFailure(error)
+      return 'network'
+    }
   }
 
-  function renameUser(rawName: string): RenameResult {
+  async function renameUser(rawName: string): Promise<RenameResult> {
     const name = clampChars(String(rawName ?? '').trim(), NAME_LIMIT)
     if (!name) return { ok: false, reason: 'empty' }
 
-    user.value = { ...user.value, name }
-    posts.value.forEach((post) => {
-      if (post.authorId === user.value.id) post.author = name
-    })
-
-    persistUser()
-    persistPosts()
-    return { ok: true }
+    try {
+      const nextUser = await updateUserName(name)
+      user.value = nextUser
+      posts.value.forEach((post) => {
+        if (post.authorId === nextUser.id) post.author = nextUser.name
+      })
+      mutatedWhileLoading = true
+      markSuccess()
+      return { ok: true }
+    } catch (error) {
+      markFailure(error)
+      return { ok: false, reason: 'network' }
+    }
   }
 
   function setView(next: ViewMode): void {
@@ -206,7 +222,7 @@ export const useForumStore = defineStore('forum', () => {
     return posts.value.find((item) => item.id === id)
   }
 
-  load()
+  void hydrate()
 
   return {
     posts,
@@ -217,11 +233,13 @@ export const useForumStore = defineStore('forum', () => {
     composeTopic,
     hotOffset,
     hotExpanded,
-    storageAvailable,
+    loading,
+    apiAvailable,
     stats,
     navCounts,
     visiblePosts,
     hotBoard,
+    hydrate,
     publish,
     toggleLike,
     removePost,
