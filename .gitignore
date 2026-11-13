@@ -15,3 +15,6 @@ npm-debug.log*
 
 # 依赖（本项目零依赖，占位以防误提交）
 node_modules/
+
+# 编辑器/工具本地数据
+.codebuddy/

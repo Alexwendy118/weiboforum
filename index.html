@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>微波论坛 · 此刻，说点什么</title>
-  <meta name="description" content="微波论坛 —— 轻量微社区。发布此刻的想法，内容保存在本机浏览器中。" />
+  <meta name="description" content="微波论坛 —— 轻量微社区。发布此刻的想法，浏览热榜与板块，内容保存在本机浏览器中。" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23FF6B2C'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23fff' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23fff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -29,6 +29,8 @@
         </span>
       </div>
 
+      <p class="topbar__quick" id="quickStats">本地社区 · 数据保存在此设备</p>
+
       <button class="userchip" id="editUserBtn" type="button" aria-haspopup="dialog">
         <span class="avatar avatar--sm" id="userAvatar" aria-hidden="true">我</span>
         <span class="userchip__meta">
@@ -45,58 +47,203 @@
 
   <main class="page">
     <section class="hero" aria-labelledby="heroTitle">
-      <p class="hero__eyebrow">今日热度 · 微波在线</p>
-      <h1 class="hero__title" id="heroTitle">把此刻的想法，<br />放进微波里转一圈。</h1>
-      <p class="hero__desc">一个只属于你这台设备的轻量小社区。发布、点赞、搜索，数据全部留在本地浏览器。</p>
-    </section>
-
-    <section class="composer card" aria-label="发布新动态">
-      <div class="composer__head">
-        <span class="avatar avatar--lg" id="composerAvatar" aria-hidden="true">我</span>
-        <label class="composer__field">
-          <span class="sr-only">动态内容</span>
-          <textarea
-            id="composerInput"
-            class="composer__input"
-            rows="3"
-            maxlength="200"
-            placeholder="此刻，说点什么…"
-            aria-describedby="composerHint"></textarea>
-        </label>
+      <div class="hero__copy">
+        <p class="hero__eyebrow">今日热度 · 微波在线</p>
+        <h1 class="hero__title" id="heroTitle">把此刻的想法，<br />放进微波里转一圈。</h1>
+        <p class="hero__desc">发布、点赞、搜索都在本机完成。内容保存在浏览器本地存储，刷新也不会丢。</p>
       </div>
-      <div class="composer__foot">
-        <div class="composer__hint" id="composerHint">
-          <span class="counter" id="charCount" aria-live="polite">0 / 140</span>
-          <span class="composer__kbd">Ctrl / ⌘ + Enter 发布</span>
-        </div>
-        <button class="btn btn--primary" id="publishBtn" type="button" disabled>
-          <span>发布</span>
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 12h13M12 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+      <form class="searchbar" id="searchForm" role="search">
+        <label class="searchbar__field">
+          <span class="sr-only">搜索动态、昵称或关键词</span>
+          <svg class="searchbar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.9" />
+            <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
           </svg>
-        </button>
+          <input id="searchInput" class="searchbar__input" type="search" placeholder="搜索动态、昵称或关键词" autocomplete="off" />
+        </label>
+        <button class="searchbar__btn" type="submit">搜索</button>
+      </form>
+
+      <div class="hero__stats">
+        <span class="stat"><strong id="statPosts">0</strong> 条动态</span>
+        <span class="stat"><strong id="statLikes">0</strong> 次点赞</span>
+        <span class="stat"><strong id="statTopics">4</strong> 个板块</span>
       </div>
     </section>
 
-    <section class="toolbar" aria-label="筛选与搜索">
-      <label class="search">
-        <svg class="search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8" />
-          <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <input id="searchInput" class="search__input" type="search" placeholder="搜索内容或昵称" autocomplete="off" />
-      </label>
+    <div class="layout">
+      <aside class="side side--left" aria-label="功能导航">
+        <nav class="card panel">
+          <div class="panel__head panel__head--plain">
+            <h2 class="panel__title">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3.5c3.2 2.4 5 4.9 5 8a5 5 0 0 1-10 0c0-3.1 1.8-5.6 5-8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                <path d="M12 13.6c1.2.9 1.9 1.9 1.9 3a1.9 1.9 0 1 1-3.8 0c0-1.1.7-2.1 1.9-3Z" fill="currentColor" opacity=".55" />
+              </svg>
+              热门推荐
+            </h2>
+          </div>
 
-      <div class="segmented" id="segmented" role="tablist" aria-label="时间线筛选">
-        <span class="segmented__thumb" id="segThumb" aria-hidden="true"></span>
-        <button class="segmented__btn is-active" type="button" role="tab" aria-selected="true" data-filter="all">全部</button>
-        <button class="segmented__btn" type="button" role="tab" aria-selected="false" data-filter="mine">我的</button>
-      </div>
-    </section>
+          <ul class="nav-list" id="viewNav">
+            <li>
+              <button class="nav-item is-active" type="button" data-view="live">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7" />
+                  <path d="M12 7.6V12l3 1.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                </svg>
+                <span class="nav-item__text">实时动态</span>
+                <span class="nav-item__count" data-count="live">0</span>
+              </button>
+            </li>
+            <li>
+              <button class="nav-item" type="button" data-view="hot">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4 19V9M10 19V5M16 19v-6M3 19h18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                </svg>
+                <span class="nav-item__text">热门榜</span>
+                <span class="nav-item__count" data-count="hot">0</span>
+              </button>
+            </li>
+            <li>
+              <button class="nav-item" type="button" data-view="liked">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 20s-7-4.2-7-9a4 4 0 0 1 7-2.7A4 4 0 0 1 19 11c0 4.8-7 9-7 9Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                </svg>
+                <span class="nav-item__text">我赞过的</span>
+                <span class="nav-item__count" data-count="liked">0</span>
+              </button>
+            </li>
+            <li>
+              <button class="nav-item" type="button" data-view="mine">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="8.6" r="3.4" stroke="currentColor" stroke-width="1.7" />
+                  <path d="M5 19.4c.9-3 3.6-4.7 7-4.7s6.1 1.7 7 4.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                </svg>
+                <span class="nav-item__text">我的动态</span>
+                <span class="nav-item__count" data-count="mine">0</span>
+              </button>
+            </li>
+          </ul>
 
-    <section class="timeline" id="timeline" aria-live="polite" aria-label="动态时间线"></section>
+          <div class="panel__divider"></div>
 
-    <p class="page__foot">数据仅保存在此浏览器的本地存储中，清理浏览器数据会一并删除。</p>
+          <div class="panel__head panel__head--plain">
+            <h2 class="panel__title">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="4" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7" />
+                <rect x="13" y="4" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7" />
+                <rect x="4" y="13" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7" />
+                <rect x="13" y="13" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.7" />
+              </svg>
+              板块
+            </h2>
+          </div>
+
+          <ul class="nav-list nav-list--topics" id="topicNav">
+            <li><button class="nav-item nav-item--sub is-active" type="button" data-topic="">全部板块</button></li>
+            <li><button class="nav-item nav-item--sub" type="button" data-topic="生活">生活</button></li>
+            <li><button class="nav-item nav-item--sub" type="button" data-topic="科技">科技</button></li>
+            <li><button class="nav-item nav-item--sub" type="button" data-topic="心情">心情</button></li>
+            <li><button class="nav-item nav-item--sub" type="button" data-topic="随笔">随笔</button></li>
+          </ul>
+        </nav>
+      </aside>
+
+      <section class="col-main" aria-label="核心内容">
+        <section class="composer card" aria-label="发布新动态">
+          <div class="composer__head">
+            <span class="avatar avatar--lg" id="composerAvatar" aria-hidden="true">我</span>
+            <label class="composer__field">
+              <span class="sr-only">动态内容</span>
+              <textarea
+                id="composerInput"
+                class="composer__input"
+                rows="3"
+                maxlength="200"
+                placeholder="此刻，说点什么…"
+                aria-describedby="composerHint"></textarea>
+            </label>
+          </div>
+
+          <div class="composer__topics">
+            <span class="composer__topics-label">板块</span>
+            <div class="topic-picker" id="topicPicker" role="group" aria-label="选择板块">
+              <button class="topic-chip is-active" type="button" data-topic-compose="随笔">随笔</button>
+              <button class="topic-chip" type="button" data-topic-compose="生活">生活</button>
+              <button class="topic-chip" type="button" data-topic-compose="科技">科技</button>
+              <button class="topic-chip" type="button" data-topic-compose="心情">心情</button>
+            </div>
+          </div>
+
+          <div class="composer__foot">
+            <div class="composer__hint" id="composerHint">
+              <span class="counter" id="charCount" aria-live="polite">0 / 140</span>
+              <span class="composer__kbd">Ctrl / ⌘ + Enter 发布</span>
+            </div>
+            <button class="btn btn--primary" id="publishBtn" type="button" disabled>
+              <span>发布</span>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 12h13M12 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <div class="feedbar">
+          <div class="tabs" id="feedTabs" role="tablist" aria-label="时间线视图">
+            <button class="tab is-active" type="button" role="tab" aria-selected="true" data-view="live">实时</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-view="hot">热门</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-view="mine">我的</button>
+          </div>
+          <p class="feedbar__meta" id="feedCount" aria-live="polite">共 0 条</p>
+        </div>
+
+        <section class="timeline" id="timeline" aria-live="polite" aria-label="动态时间线"></section>
+
+        <p class="page__foot">数据仅保存在此浏览器的本地存储中 · 微波论坛 v1.1</p>
+      </section>
+
+      <aside class="side side--right" aria-label="热榜与推荐">
+        <section class="card panel hot" id="hotCard">
+          <div class="panel__head">
+            <h2 class="panel__title">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M13 3 5 13.5h5L9.5 21 18 10h-5l.5-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+              </svg>
+              微波热榜
+            </h2>
+            <button class="icon-btn" id="hotRefresh" type="button" aria-label="换一换热榜内容">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.6-5.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                <path d="M20 4.6V10h-5.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+          <ol class="hot-list" id="hotList"></ol>
+          <button class="panel__more" id="hotMore" type="button">查看更多</button>
+        </section>
+
+        <section class="card promo">
+          <span class="promo__badge">本地版 · v1.1</span>
+          <h2 class="promo__title">把此刻，<br />写进微波里。</h2>
+          <p class="promo__desc">没有账号，也没有云端。你写下的每一句，都留在这台设备上。</p>
+          <button class="btn promo__btn" id="promoBtn" type="button">发布动态</button>
+          <span class="promo__halo" aria-hidden="true"></span>
+        </section>
+
+        <section class="card panel mini">
+          <h2 class="panel__title">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.7" />
+              <path d="M12 11v5.2M12 7.9v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+            </svg>
+            小提示
+          </h2>
+          <p class="mini__text">用左侧「板块」筛选内容，点击热榜条目可快速定位到对应动态。</p>
+        </section>
+      </aside>
+    </div>
   </main>
 
   <dialog class="sheet" id="userDialog" aria-labelledby="userDialogTitle">
