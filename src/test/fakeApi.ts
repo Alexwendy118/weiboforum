@@ -87,6 +87,7 @@ async function handle(input: unknown, init?: RequestInit): Promise<FakeResponse>
       createdAt: Date.now(),
       likes: 0,
       likedByMe: false,
+      favorited: false,
     }
     state.posts = [post, ...state.posts]
     return respond(201, { post })
@@ -112,6 +113,16 @@ async function handle(input: unknown, init?: RequestInit): Promise<FakeResponse>
       target.likedByMe = body.liked
       target.likes = Math.max(0, target.likes + (body.liked ? 1 : -1))
     }
+    return respond(200, { post: target })
+  }
+
+  const favoriteMatch = /^\/posts\/([^/]+)\/favorite$/.exec(path)
+  if (favoriteMatch && method === 'PUT') {
+    const id = decodeURIComponent(favoriteMatch[1] as string)
+    const target = state.posts.find((post) => post.id === id)
+    if (!target) return respond(404, { error: 'not-found' })
+    if (typeof body.favorited !== 'boolean') return respond(400, { error: 'invalid-body' })
+    target.favorited = body.favorited
     return respond(200, { post: target })
   }
 

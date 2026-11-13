@@ -12,6 +12,7 @@ function makePost(id: string, likes: number, createdAt: number): Post {
     likes,
     createdAt,
     likedByMe: false,
+    favorited: false,
   }
 }
 

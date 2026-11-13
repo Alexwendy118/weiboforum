@@ -38,6 +38,7 @@ export function normalizePosts(raw: unknown): Post[] {
       createdAt: Number(item.createdAt) || Date.now(),
       likes: Math.max(0, Number(item.likes) || 0),
       likedByMe: Boolean(item.likedByMe),
+      favorited: Boolean(item.favorited),
     }))
 }
 
@@ -79,6 +80,7 @@ export function createSeedPosts(now: number = Date.now()): Post[] {
     createdAt: now - seed.minutes * 60_000,
     likes: seed.likes,
     likedByMe: false,
+    favorited: false,
   }))
 }
 
@@ -89,6 +91,7 @@ export function filterPosts(posts: readonly Post[], filter: PostFilter): Post[] 
   return posts.filter((post) => {
     if (filter.view === 'mine' && post.authorId !== filter.userId) return false
     if (filter.view === 'liked' && !post.likedByMe) return false
+    if (filter.view === 'favorites' && !post.favorited) return false
     if (filter.topic && normalizeTopic(post.topic) !== filter.topic) return false
     if (!query) return true
     return (

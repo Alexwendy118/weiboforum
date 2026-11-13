@@ -34,6 +34,14 @@ describe('emptyCopyFor', () => {
     })
   })
 
+  it('我收藏的为空时引导去热榜', () => {
+    expect(emptyCopyFor({ query: '', view: 'favorites', topic: '' })).toMatchObject({
+      title: '还没有收藏过',
+      action: '看看热榜',
+      kind: 'hot',
+    })
+  })
+
   it('板块为空时带上板块名', () => {
     expect(emptyCopyFor({ query: '', view: 'live', topic: '科技' })).toMatchObject({
       title: '「科技」板块还很安静',

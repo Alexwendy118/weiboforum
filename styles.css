@@ -844,6 +844,20 @@ body.is-locked {
   100% { transform: scale(1); }
 }
 
+.post__action.is-favorited {
+  color: var(--warning);
+}
+
+.post__action.is-favorited svg {
+  fill: rgba(240, 160, 32, 0.85);
+  stroke: var(--warning);
+}
+
+.post__action.is-favorited:hover {
+  color: var(--warning);
+  background: rgba(240, 160, 32, 0.09);
+}
+
 .post__action--delete:hover {
   color: var(--danger);
   background: rgba(224, 72, 60, 0.09);

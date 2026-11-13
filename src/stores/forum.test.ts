@@ -18,6 +18,7 @@ function storedPost(overrides: Partial<Post> = {}): Post {
     createdAt: NOW,
     likes: 2,
     likedByMe: false,
+    favorited: false,
     ...overrides,
   }
 }
@@ -220,6 +221,84 @@ describe('点赞', () => {
   })
 })
 
+describe('收藏', () => {
+  it('收藏与取消收藏同步状态与后端', async () => {
+    seedApi([storedPost()])
+    const store = await createStore()
+
+    expect(await store.toggleFavorite('stored-1')).toBe(true)
+    expect(store.posts[0]).toMatchObject({ favorited: true })
+    expect(apiPosts()[0]).toMatchObject({ favorited: true })
+
+    expect(await store.toggleFavorite('stored-1')).toBe(true)
+    expect(store.posts[0]).toMatchObject({ favorited: false })
+    expect(apiPosts()[0]).toMatchObject({ favorited: false })
+  })
+
+  it('未知动态返回 false', async () => {
+    const store = await createStore()
+    expect(await store.toggleFavorite('missing')).toBe(false)
+  })
+
+  it('同一动态连点只发出一次请求，状态不会错乱', async () => {
+    seedApi([storedPost({ favorited: false })])
+    const store = await createStore()
+
+    const results = await Promise.all([
+      store.toggleFavorite('stored-1'),
+      store.toggleFavorite('stored-1'),
+    ])
+
+    expect(results).toEqual([true, false])
+    expect(store.posts[0]).toMatchObject({ favorited: true })
+    expect(apiPosts()[0]).toMatchObject({ favorited: true })
+  })
+
+  it('网络失败时回滚收藏状态并返回 false', async () => {
+    seedApi([storedPost({ favorited: false })])
+    const store = await createStore()
+    failNextRequests(1)
+
+    expect(await store.toggleFavorite('stored-1')).toBe(false)
+    expect(store.posts[0]).toMatchObject({ favorited: false })
+    expect(store.apiAvailable).toBe(false)
+  })
+
+  it('收藏影响导航计数与统计', async () => {
+    seedApi([storedPost({ id: 'a' }), storedPost({ id: 'b', favorited: true })])
+    const store = await createStore()
+
+    expect(store.navCounts.favorites).toBe(1)
+    expect(store.stats.favorites).toBe(1)
+
+    await store.toggleFavorite('a')
+    expect(store.navCounts.favorites).toBe(2)
+    expect(store.stats.favorites).toBe(2)
+
+    await store.toggleFavorite('b')
+    expect(store.navCounts.favorites).toBe(1)
+    expect(store.stats.favorites).toBe(1)
+  })
+
+  it('「我收藏的」视图只展示收藏内容，可与板块筛选叠加', async () => {
+    seedApi(
+      [
+        storedPost({ id: 'fav-tech', favorited: true, topic: '科技' }),
+        storedPost({ id: 'plain', topic: '科技' }),
+        storedPost({ id: 'fav-life', favorited: true, topic: '生活' }),
+      ],
+      { id: 'user-me', name: '微波过客' },
+    )
+    const store = await createStore()
+
+    store.setView('favorites')
+    expect(store.visiblePosts.map((post) => post.id)).toEqual(['fav-tech', 'fav-life'])
+
+    store.setTopic('科技')
+    expect(store.visiblePosts.map((post) => post.id)).toEqual(['fav-tech'])
+  })
+})
+
 describe('删除动态', () => {
   it('可以删除自己的动态并同步后端', async () => {
     seedApi([storedPost({ id: 'mine', authorId: 'me' }), storedPost({ id: 'other', authorId: 'other' })], {
@@ -354,10 +433,11 @@ describe('筛选、视图与统计', () => {
   it('导航计数与统计随内容变化', async () => {
     const store = await createStore()
 
-    expect(store.navCounts).toEqual({ live: 3, hot: 1, liked: 1, mine: 2 })
+    expect(store.navCounts).toEqual({ live: 3, hot: 1, liked: 1, favorites: 0, mine: 2 })
     expect(store.stats).toEqual({
       posts: 3,
       likes: 5,
+      favorites: 0,
       topics: TOPICS.length,
       quick: '本地社区 · 3 条动态 · 5 次点赞',
     })
@@ -371,7 +451,7 @@ describe('筛选、视图与统计', () => {
     seedApi([], { id: 'user-me', name: '我' })
     const store = await createStore()
 
-    expect(store.navCounts).toEqual({ live: 0, hot: 0, liked: 0, mine: 0 })
+    expect(store.navCounts).toEqual({ live: 0, hot: 0, liked: 0, favorites: 0, mine: 0 })
     expect(store.stats.likes).toBe(0)
   })
 })

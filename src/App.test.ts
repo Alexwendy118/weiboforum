@@ -46,7 +46,7 @@ describe('App 整体行为', () => {
     expect(app.find('.page__foot').text()).toContain('微波论坛 v2.0')
 
     const counts = app.findAll('.nav-item__count').map((node) => node.text())
-    expect(counts).toEqual(['3', '3', '0', '0'])
+    expect(counts).toEqual(['3', '3', '0', '0', '0'])
   })
 
   it('加载完成前展示加载提示而不是空状态', async () => {
@@ -182,6 +182,43 @@ describe('App 整体行为', () => {
     expect(store.posts.find((post) => post.id === first.attributes('data-id'))!.likedByMe).toBe(true)
     expect(app.find('#statLikes').text()).toBe('48')
     expect(app.find('#feedCount').text()).toBe('共 3 条')
+  })
+
+  it('切换到「我收藏的」视图只显示收藏的动态', async () => {
+    seedApi([
+      makePost({ id: 'fav-1', favorited: true, content: '收藏的一条' }),
+      makePost({ id: 'plain-1', content: '未收藏的一条' }),
+    ])
+    const app = await mountApp()
+
+    expect(app.find('.tab[data-view="favorites"]').exists()).toBe(true)
+    await app.find('.tab[data-view="favorites"]').trigger('click')
+
+    expect(app.findAll('.post')).toHaveLength(1)
+    expect(app.find('.post .post__body').text()).toBe('收藏的一条')
+    expect(app.find('#feedCount').text()).toBe('共 1 条')
+  })
+
+  it('收藏动态后可在「我收藏的」视图中看到', async () => {
+    seedApi([makePost({ id: 'p-fav', content: '待收藏的一条' })])
+    const app = await mountApp()
+
+    await app.find('.post [data-action="favorite"]').trigger('click')
+    await flushPromises()
+
+    await app.find('.nav-item[data-view="favorites"]').trigger('click')
+
+    expect(app.findAll('.post')).toHaveLength(1)
+    expect(app.find('.post .post__body').text()).toBe('待收藏的一条')
+    expect(app.find('[data-count="favorites"]').text()).toBe('1')
+  })
+
+  it('我收藏的视图为空时展示引导文案', async () => {
+    const app = await mountApp()
+
+    await app.find('.tab[data-view="favorites"]').trigger('click')
+
+    expect(app.find('.empty__title').text()).toBe('还没有收藏过')
   })
 
   it('后端不可用时给出连接失败提示', async () => {
