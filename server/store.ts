@@ -13,11 +13,14 @@ export type DeleteResult = { ok: true; post: Post } | { ok: false; reason: 'not-
 
 export type LikeResult = { ok: true; post: Post } | { ok: false; reason: 'not-found' }
 
+export type FavoritedResult = { ok: true; post: Post } | { ok: false; reason: 'not-found' }
+
 export interface MemoryStore {
   listPosts(): Post[]
   createPost(input: CreatePostInput): Post
   deletePost(id: string): DeleteResult
   setLike(id: string, liked: boolean): LikeResult
+  setFavorite(id: string, favorited: boolean): FavoritedResult
   getUser(): User
   renameUser(name: string): User
 }
@@ -34,7 +37,11 @@ export interface MemoryStoreOptions {
 export function createMemoryStore(options: MemoryStoreOptions = {}): MemoryStore {
   const clock = options.now ?? Date.now
 
-  let posts: Post[] = createSeedPosts(clock())
+  let posts: Post[] = createSeedPosts(clock()).map((post, index) => ({
+    ...post,
+    // 播种数据中让部分示例动态处于已收藏状态，方便前端展示两种态
+    favorited: index % 2 === 1,
+  }))
   let user: User = { id: createId(), name: DEFAULT_USER_NAME }
 
   function findPost(id: string): Post | undefined {
@@ -58,6 +65,7 @@ export function createMemoryStore(options: MemoryStoreOptions = {}): MemoryStore
         createdAt: clock(),
         likes: 0,
         likedByMe: false,
+        favorited: false,
       }
       posts = [post, ...posts]
       return post
@@ -80,6 +88,14 @@ export function createMemoryStore(options: MemoryStoreOptions = {}): MemoryStore
         post.likedByMe = liked
         post.likes = Math.max(0, post.likes + (liked ? 1 : -1))
       }
+      return { ok: true, post }
+    },
+
+    setFavorite(id: string, favorited: boolean): FavoritedResult {
+      const post = findPost(id)
+      if (!post) return { ok: false, reason: 'not-found' }
+
+      post.favorited = favorited
       return { ok: true, post }
     },
 

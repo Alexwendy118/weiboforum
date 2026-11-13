@@ -4,7 +4,17 @@ import { CHAR_LIMIT, DEFAULT_USER_NAME, NAME_LIMIT } from '../src/domain/constan
 import { createApp } from './app'
 import { createMemoryStore } from './store'
 
-const POST_FIELDS = ['author', 'authorId', 'content', 'createdAt', 'id', 'likedByMe', 'likes', 'topic']
+const POST_FIELDS = [
+  'author',
+  'authorId',
+  'content',
+  'createdAt',
+  'favorited',
+  'id',
+  'likedByMe',
+  'likes',
+  'topic',
+]
 
 function setup() {
   const store = createMemoryStore()
@@ -64,7 +74,20 @@ describe('GET /api/posts', () => {
       expect(typeof post.createdAt).toBe('number')
       expect(typeof post.likes).toBe('number')
       expect(typeof post.likedByMe).toBe('boolean')
+      expect(typeof post.favorited).toBe('boolean')
     }
+  })
+
+  it('播种数据中包含部分已收藏的示例动态', async () => {
+    const { app } = setup()
+    const payload = (await (await app.request('/api/posts')).json()) as {
+      posts: Array<{ id: string; favorited: boolean }>
+    }
+    const seeds = payload.posts.filter((post) => post.id.startsWith('seed-'))
+
+    expect(seeds.length).toBeGreaterThan(0)
+    expect(seeds.some((post) => post.favorited === true)).toBe(true)
+    expect(seeds.some((post) => post.favorited === false)).toBe(true)
   })
 
   it('不同实例的数据互相隔离', async () => {
@@ -101,6 +124,7 @@ describe('POST /api/posts', () => {
       authorId: store.getUser().id,
       likes: 0,
       likedByMe: false,
+      favorited: false,
     })
     expect(payload.post.id).toEqual(expect.any(String))
 
@@ -274,6 +298,98 @@ describe('PUT /api/posts/:id/like', () => {
   it('未知动态返回 404 not-found', async () => {
     const { app } = setup()
     const response = await app.request('/api/posts/nope/like', jsonRequest('PUT', { liked: true }))
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'not-found' })
+  })
+})
+
+describe('PUT /api/posts/:id/favorite', () => {
+  it('设置收藏返回 200，favorited 置为 true', async () => {
+    const { app } = setup()
+    const response = await app.request(
+      '/api/posts/seed-1/favorite',
+      jsonRequest('PUT', { favorited: true }),
+    )
+    const payload = (await response.json()) as { post: { favorited: boolean } }
+
+    expect(response.status).toBe(200)
+    expect(payload.post.favorited).toBe(true)
+  })
+
+  it('取消收藏返回 200，favorited 置为 false', async () => {
+    const { app } = setup()
+    const first = (await (
+      await app.request('/api/posts/seed-1/favorite', jsonRequest('PUT', { favorited: true }))
+    ).json()) as { post: { favorited: boolean } }
+    const second = (await (
+      await app.request('/api/posts/seed-1/favorite', jsonRequest('PUT', { favorited: false }))
+    ).json()) as { post: { favorited: boolean } }
+
+    expect(first.post.favorited).toBe(true)
+    expect(second.post.favorited).toBe(false)
+  })
+
+  it('重复设置同值幂等，不改变结果', async () => {
+    const { app } = setup()
+    const first = (await (
+      await app.request('/api/posts/seed-2/favorite', jsonRequest('PUT', { favorited: true }))
+    ).json()) as { post: { favorited: boolean } }
+    const second = (await (
+      await app.request('/api/posts/seed-2/favorite', jsonRequest('PUT', { favorited: true }))
+    ).json()) as { post: { favorited: boolean } }
+
+    expect(first.post.favorited).toBe(true)
+    expect(second.post.favorited).toBe(true)
+  })
+
+  it('响应 post 包含完整字段且 favorited 为 boolean', async () => {
+    const { app } = setup()
+    const response = await app.request(
+      '/api/posts/seed-1/favorite',
+      jsonRequest('PUT', { favorited: true }),
+    )
+    const payload = (await response.json()) as { post: Record<string, unknown> }
+
+    expect(Object.keys(payload.post).sort()).toEqual(POST_FIELDS)
+    expect(typeof payload.post.favorited).toBe('boolean')
+  })
+
+  it('缺少或非法 favorited 返回 400 invalid-body', async () => {
+    const { app } = setup()
+    const missing = await app.request('/api/posts/seed-1/favorite', jsonRequest('PUT', {}))
+    const wrong = await app.request(
+      '/api/posts/seed-1/favorite',
+      jsonRequest('PUT', { favorited: 'yes' }),
+    )
+
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toEqual({ error: 'invalid-body' })
+    expect(wrong.status).toBe(400)
+    expect(await wrong.json()).toEqual({ error: 'invalid-body' })
+  })
+
+  it('非对象请求体与非法 JSON 返回 400 invalid-body', async () => {
+    const { app } = setup()
+    const array = await app.request('/api/posts/seed-1/favorite', jsonRequest('PUT', [1, 2]))
+    const broken = await app.request('/api/posts/seed-1/favorite', {
+      method: 'PUT',
+      body: '{ not json',
+      headers: { 'content-type': 'application/json' },
+    })
+
+    expect(array.status).toBe(400)
+    expect(await array.json()).toEqual({ error: 'invalid-body' })
+    expect(broken.status).toBe(400)
+    expect(await broken.json()).toEqual({ error: 'invalid-body' })
+  })
+
+  it('未知动态返回 404 not-found', async () => {
+    const { app } = setup()
+    const response = await app.request(
+      '/api/posts/nope/favorite',
+      jsonRequest('PUT', { favorited: true }),
+    )
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not-found' })

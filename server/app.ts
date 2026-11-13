@@ -88,6 +88,20 @@ export function createApp(store: MemoryStore = createMemoryStore()): Hono {
     return c.json({ post: result.post })
   })
 
+  app.put('/api/posts/:id/favorite', async (c) => {
+    const body = await readJsonBody(c)
+    if (!body.ok) return bodyError(c, body.error)
+
+    const payload = body.value
+    if (!isRecord(payload) || typeof payload.favorited !== 'boolean') {
+      return c.json({ error: 'invalid-body' }, 400)
+    }
+
+    const result = store.setFavorite(c.req.param('id'), payload.favorited)
+    if (!result.ok) return c.json({ error: 'not-found' }, 404)
+    return c.json({ post: result.post })
+  })
+
   app.get('/api/user', (c) => c.json({ user: store.getUser() }))
 
   app.patch('/api/user', async (c) => {

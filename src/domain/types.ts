@@ -13,6 +13,8 @@ export interface Post {
   createdAt: number
   likes: number
   likedByMe: boolean
+  /** 收藏状态；服务端始终输出，旧数据可缺省视为未收藏 */
+  favorited?: boolean
 }
 
 export interface User {
